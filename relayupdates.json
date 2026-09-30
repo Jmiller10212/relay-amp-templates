@@ -10,14 +10,5 @@
     "OverwriteExistingFiles": true,
     "DeleteAfterExtract": true,
     "SkipOnFailure": false
-  },
-  {
-    "UpdateStageName": "Make Relay Executable",
-    "UpdateSourcePlatform": "Linux",
-    "UpdateSourceArch": "x86_64",
-    "UpdateSource": "Executable",
-    "UpdateSourceData": "/bin/chmod",
-    "UpdateSourceArgs": "+x {{$FullBaseDir}}relay-server",
-    "SkipOnFailure": false
   }
 ]
