@@ -17,7 +17,7 @@
     "UpdateSourceArch": "x86_64",
     "UpdateSource": "Executable",
     "UpdateSourceData": "/bin/chmod",
-    "UpdateSourceArgs": "+x relay-server",
+    "UpdateSourceArgs": "+x {{$FullBaseDir}}relay-server",
     "SkipOnFailure": false
   }
 ]
