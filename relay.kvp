@@ -21,8 +21,8 @@ Meta.Prerequisites=[]
 Meta.ExtraContainerPackages=[]
 Meta.ConfigReleaseState=NotSpecified
 Meta.NoCommercialUsage=False
-Meta.ConfigVersion=2
-Meta.ReleaseNotes=Initial private Relay MVP template
+Meta.ConfigVersion=3
+Meta.ReleaseNotes=Adds configurable room, welcome, presence and lifecycle events, retention, connection limits, and WebSocket timing.
 Meta.BreakingReleaseNotes=
 Meta.AppConfigId=8b6b52c3-9f67-4d50-a433-2cc5f7c23d15
 Meta.ImportableExtensions=[]
@@ -59,7 +59,7 @@ App.AdminPortRef=0
 App.PrimaryApplicationPortRef=ServerPort
 App.UniversalSleepApplicationUDPPortRef=0
 App.UniversalSleepSteamQueryPortRef=0
-App.MaxUsers=0
+App.MaxUsers={{MaxConnections}}
 App.UseRandomAdminPassword=False
 App.PersistRandomPassword=False
 App.RemoteAdminPassword=
@@ -96,6 +96,7 @@ Console.AppReadyRegex=^RELAY READY(?: .*)?$
 Console.UserJoinRegex=^.*USER CONNECTED username=(?<username>.+)$
 Console.UserLeaveRegex=^.*USER DISCONNECTED username=(?<username>.+)$
 Console.UserChatRegex=^$
+Console.ServerInfoRegex=^.*EVENT type=(?<event>[a-z_]+) detail=(?<details>.*)$
 Console.UpdateAvailableRegex=^$
 Console.PreConnectRegex=
 Console.ConnectIPRegex=
