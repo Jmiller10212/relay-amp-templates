@@ -1,0 +1,14 @@
+[
+  {
+    "UpdateStageName": "Download Relay",
+    "UpdateSourcePlatform": "Linux",
+    "UpdateSourceArch": "x86_64",
+    "UpdateSource": "FetchURL",
+    "UpdateSourceData": "{{PackageURL}}",
+    "UpdateSourceTarget": "{{$FullBaseDir}}",
+    "UnzipUpdateSource": true,
+    "OverwriteExistingFiles": true,
+    "DeleteAfterExtract": true,
+    "SkipOnFailure": false
+  }
+]

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#11131a">
+  <title>Relay</title>
+  <link rel="stylesheet" href="/styles.css?v=0.7.0">
+  <link rel="stylesheet" href="/friends.css?v=0.7.0">
+</head>
+<body>
+  <main id="auth-shell" class="auth-shell">
+    <section class="auth-card">
+      <div class="brand auth-brand"><span class="brand-mark">R</span><div><strong>Relay</strong><small>Private communication</small></div></div>
+      <div id="notice" class="notice" hidden></div>
+
+      <form id="login-view" class="view auth-form">
+        <header><h1>Welcome back</h1><p>Sign in to enter your Relay server.</p></header>
+        <label>Email<input data-relay-field name="email" type="email" autocomplete="email" required></label>
+        <label>Password<input data-relay-field name="password" type="password" autocomplete="current-password" required></label>
+        <div class="form-row"><button type="button" class="link" data-view="forgot-view">Forgot password?</button></div>
+        <div class="form-error" role="alert"></div><button class="primary" type="submit">Sign in</button>
+        <p class="switch">New to Relay? <button type="button" class="link" data-view="register-view">Create an account</button></p>
+      </form>
+
+      <form id="register-view" class="view auth-form" hidden>
+        <header><h1>Create account</h1><p>Your username is unique. Your display name can change anytime.</p></header>
+        <div class="two"><label>Username<input data-relay-field name="username" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text" minlength="3" maxlength="32" pattern="[a-z0-9_]+" required placeholder="lowercase_name"></label><label>Display name<input data-relay-field name="displayName" autocomplete="nickname" required></label></div>
+        <label>Email<input data-relay-field name="email" type="email" autocomplete="email" required></label>
+        <div class="two"><label>Password<input data-relay-field name="password" type="password" autocomplete="new-password" required></label><label>Confirm password<input data-relay-field name="passwordConfirmation" type="password" autocomplete="new-password" required></label></div>
+        <div class="form-error" role="alert"></div><button class="primary" type="submit">Create account</button>
+        <p class="switch">Already registered? <button type="button" class="link" data-view="login-view">Sign in</button></p>
+      </form>
+
+      <form id="forgot-view" class="view auth-form" hidden>
+        <header><h1>Reset password</h1><p>Enter your email. If an account exists, Relay will send a secure recovery link.</p></header>
+        <label>Email<input data-relay-field name="email" type="email" autocomplete="email" required></label>
+        <div class="form-error" role="alert"></div><button class="primary" type="submit">Send recovery email</button>
+        <p class="switch"><button type="button" class="link" data-view="login-view">Back to sign in</button></p>
+      </form>
+
+      <form id="reset-view" class="view auth-form" hidden>
+        <header><h1>Choose a new password</h1><p>This recovery session can be used once and expires shortly.</p></header>
+        <label>New password<input data-relay-field name="password" type="password" autocomplete="new-password" required></label>
+        <label>Confirm password<input data-relay-field name="passwordConfirmation" type="password" autocomplete="new-password" required></label>
+        <div class="form-error" role="alert"></div><button class="primary" type="submit">Update password</button>
+      </form>
+
+      <form id="finish-view" class="view auth-form" hidden>
+        <header><h1>Finish your profile</h1><p>Choose the Relay identity linked to your verified account.</p></header>
+        <label>Username<input data-relay-field name="username" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text" minlength="3" maxlength="32" pattern="[a-z0-9_]+" required placeholder="lowercase_name"></label>
+        <label>Display name<input data-relay-field name="displayName" autocomplete="nickname" required></label>
+        <div class="form-error" role="alert"></div><button class="primary" type="submit">Enter Relay</button>
+      </form>
+
+      <section id="check-email-view" class="view centered" hidden><div class="mail-icon">✉</div><h1>Check your email</h1><p>Use the secure link Relay sent you. You can safely close this page.</p><button id="resend-button" class="secondary" type="button">Resend verification email</button><button class="link" type="button" data-view="login-view">Back to sign in</button></section>
+      <section id="restoring-view" class="view centered" hidden><div class="mail-icon">R</div><h1>Restoring session</h1><p>Relay is reconnecting. You will return automatically when the server is ready.</p></section>
+    </section>
+  </main>
+
+  <main id="chat-shell" class="app-shell" hidden>
+    <nav class="primary-rail" aria-label="Relay destinations">
+      <button id="rail-home" class="rail-button active" type="button" aria-label="Home and direct messages"><span class="relay-glyph">R</span><b id="home-badge" class="rail-badge" hidden>0</b></button>
+      <div class="rail-divider"></div>
+      <button id="rail-lobby" class="rail-button" type="button" aria-label="Global lobby"><span>#</span></button>
+      <div id="server-rail" class="server-rail"></div>
+      <div class="rail-spacer"></div>
+      <button id="add-server-button" class="rail-button future" type="button" title="Create or join a server" aria-label="Create or join a server"><span>+</span></button>
+    </nav>
+
+    <aside id="context-sidebar" class="context-sidebar">
+      <section id="home-context" class="context-view">
+        <label class="conversation-search"><span class="sr-only">Find or start a conversation</span><input id="home-search" placeholder="Find or start a conversation" autocomplete="off"></label>
+        <button id="friends-destination" class="context-destination active" type="button"><span>Friends</span><b id="friends-badge" class="badge" hidden>0</b></button>
+        <button id="server-invites-destination" class="context-destination" type="button"><span>Server Invitations</span><b id="server-invites-badge" class="badge" hidden>0</b></button>
+        <div class="sidebar-divider"></div>
+        <div class="dm-heading"><span>Direct Messages</span><button id="new-dm-button" type="button" aria-label="Start a direct message">+</button></div>
+        <div id="dm-list" class="dm-list" role="list"></div>
+      </section>
+      <section id="lobby-context" class="context-view" hidden>
+        <div class="context-brand"><span class="brand-mark">R</span><div><strong>Relay Lobby</strong><small>Shared community space</small></div></div>
+        <button id="lobby-room-button" class="context-destination active" type="button"><span id="room-name"># general</span></button>
+        <section class="people"><div class="section-title"><span>Online</span><span id="online-count">0</span></div><ul id="user-list"></ul></section>
+      </section>
+      <section id="server-context" class="context-view" hidden>
+        <div class="context-brand server-brand"><span id="server-context-mark" class="brand-mark">S</span><div><strong id="server-context-name">Server</strong><small>Relay server</small></div></div>
+        <div class="section-title"><span>Text Channels</span></div>
+        <button id="server-general-button" class="context-destination active" type="button"><span># general</span></button>
+        <div class="sidebar-divider"></div>
+        <button id="server-members-button" class="context-destination" type="button"><span>Members</span></button>
+        <button id="server-invite-button" class="context-destination" type="button"><span>Invite People</span></button>
+        <button id="server-settings-button" class="context-destination" type="button"><span>Server Settings</span></button>
+      </section>
+      <button id="account-button" class="identity" type="button"><span id="avatar">?</span><div><strong id="current-user"></strong><small id="current-handle"></small></div><i id="connection-dot"></i></button>
+    </aside>
+
+    <section class="main-stage">
+      <header id="mobile-header" class="mobile-header"><button id="mobile-back" type="button" aria-label="Back to navigation">‹</button><strong id="mobile-title">Relay</strong></header>
+      <div id="app-notice" class="notice app-notice" hidden></div>
+
+      <section id="friends-view" class="friends-view">
+        <header class="friends-header"><strong>Friends</strong><nav aria-label="Friends views"><button data-friends-tab="online" class="active" type="button">Online</button><button data-friends-tab="all" type="button">All</button><button data-friends-tab="pending" type="button">Pending <b id="pending-tab-badge" class="badge" hidden>0</b></button><button data-friends-tab="add" class="add-tab" type="button">Add Friend</button></nav><span id="status-pill" class="pill offline">Connecting</span></header>
+        <div id="friends-online-view" class="friends-tab-view"><label class="list-search"><span class="sr-only">Search online friends</span><input id="online-filter" placeholder="Search"></label><div class="list-label"><span>Online</span><span id="online-friends-count">0</span></div><div id="friends-online" class="friend-list"></div></div>
+        <div id="friends-all-view" class="friends-tab-view" hidden><label class="list-search"><span class="sr-only">Search all friends</span><input id="all-filter" placeholder="Search"></label><div class="list-label"><span>All friends</span><span id="all-friends-count">0</span></div><div id="friends-all" class="friend-list"></div></div>
+        <div id="friends-pending-view" class="friends-tab-view" hidden><section><div class="list-label"><span>Incoming</span><span id="incoming-count">0</span></div><div id="friends-incoming" class="friend-list"></div></section><section><div class="list-label"><span>Outgoing</span><span id="outgoing-count">0</span></div><div id="friends-outgoing" class="friend-list"></div></section></div>
+        <div id="friends-add-view" class="friends-tab-view add-friend-view" hidden><h2>Add Friend</h2><p>You can add friends using their exact Relay username.</p><form id="add-friend-form" class="add-friend"><label class="sr-only" for="friend-username">Relay username</label><div class="add-friend-box"><input id="friend-username" pattern="[a-z0-9_]+" maxlength="32" placeholder="Enter an exact Relay username" required><button class="primary">Send Friend Request</button></div><div id="add-friend-status" class="inline-status" role="status"></div></form></div>
+      </section>
+
+      <section id="server-invites-view" class="friends-view" hidden>
+        <header class="friends-header"><strong>Server Invitations</strong></header>
+        <div class="friends-tab-view"><div class="list-label"><span>Pending Invitations</span><span id="server-invite-count">0</span></div><div id="server-invite-list" class="friend-list"></div></div>
+      </section>
+
+      <section id="conversation-view" class="conversation-view" hidden>
+        <header class="conversation-header"><div><strong id="conversation-title"># general</strong><span id="conversation-subtitle">The shared Relay room</span></div><span id="conversation-presence" class="pill offline" hidden>Offline</span></header>
+        <div id="read-only-banner" class="read-only-banner" hidden>This conversation is read-only because you are no longer friends.</div>
+        <div id="messages" class="messages" aria-live="polite"><button id="load-earlier" class="load-earlier" type="button" hidden>Load earlier messages</button></div>
+        <form id="message-form" class="composer"><label class="sr-only" for="message-input">Message</label><input id="message-input" maxlength="2000" autocomplete="off" placeholder="Message #general"><button type="submit">Send</button></form>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="new-dm-dialog" class="compact-dialog">
+    <div class="dialog-head"><div><h2>New Message</h2><p>Select one friend to open a direct conversation.</p></div><button id="new-dm-close" class="icon-button" aria-label="Close">×</button></div>
+    <label class="list-search modal-search"><span class="sr-only">Search friends</span><input id="new-dm-search" placeholder="Search friends"></label>
+    <div id="new-dm-list" class="modal-friend-list" role="listbox"></div>
+    <div class="dialog-actions"><button id="new-dm-cancel" class="secondary" type="button">Cancel</button><button id="new-dm-open" class="primary" type="button" disabled>Open Message</button></div>
+  </dialog>
+
+  <dialog id="remove-friend-dialog" class="confirm-dialog">
+    <div class="dialog-head"><div><h2>Remove friend?</h2><p id="remove-friend-copy"></p></div><button id="remove-friend-close" class="icon-button" aria-label="Close">×</button></div>
+    <div class="dialog-actions"><button id="remove-friend-cancel" class="secondary" type="button">Cancel</button><button id="remove-friend-confirm" class="danger compact" type="button">Remove Friend</button></div>
+  </dialog>
+
+  <dialog id="server-create-dialog" class="compact-dialog">
+    <div class="dialog-head"><div><h2>Create a Server</h2><p>Relay creates a private #general automatically.</p></div><button class="icon-button" data-close-dialog="server-create-dialog" aria-label="Close">×</button></div>
+    <form id="server-create-form" class="settings-section"><label>Server name<input name="name" maxlength="100" required placeholder="My Server"></label><div class="form-error"></div><div class="dialog-actions"><button id="server-create-invites" class="secondary" type="button">View Invitations</button><button class="primary" type="submit">Create Server</button></div></form>
+  </dialog>
+
+  <dialog id="server-invite-dialog" class="compact-dialog">
+    <div class="dialog-head"><div><h2>Invite People</h2><p>Select one of your Relay friends.</p></div><button class="icon-button" data-close-dialog="server-invite-dialog" aria-label="Close">×</button></div>
+    <label class="list-search modal-search"><span class="sr-only">Search friends</span><input id="server-invite-search" placeholder="Search friends"></label><div id="server-invite-friends" class="modal-friend-list"></div>
+  </dialog>
+
+  <dialog id="server-members-dialog">
+    <div class="dialog-head"><div><h2>Server Members</h2><p id="server-members-copy"></p></div><button class="icon-button" data-close-dialog="server-members-dialog" aria-label="Close">×</button></div><div id="server-members-list" class="friend-list settings-section"></div>
+  </dialog>
+
+  <dialog id="server-settings-dialog">
+    <div class="dialog-head"><div><h2>Server Settings</h2><p id="server-settings-name"></p></div><button class="icon-button" data-close-dialog="server-settings-dialog" aria-label="Close">×</button></div>
+    <form id="server-rename-form" class="settings-section"><h3>Server name</h3><div class="inline"><input name="name" maxlength="100" required><button class="secondary">Save</button></div><div class="form-error"></div></form>
+    <form id="server-transfer-form" class="settings-section"><h3>Transfer ownership</h3><p>The new owner must already be a member.</p><select name="userId" required></select><label class="check"><input name="confirm" type="checkbox" required> I understand that I will become a member.</label><button class="secondary">Transfer</button><div class="form-error"></div></form>
+    <section class="settings-section"><h3>Leave server</h3><button id="server-leave-button" class="danger compact" type="button">Leave Server</button></section>
+    <form id="server-delete-form" class="settings-section"><h3>Delete server</h3><p>This permanently deletes its channel and messages. Enter the exact server name.</p><input name="name" required><button class="danger compact">Delete Server</button><div class="form-error"></div></form>
+  </dialog>
+
+  <dialog id="settings-dialog">
+    <div class="dialog-head"><div><h2>Account settings</h2><p id="settings-email"></p></div><button id="settings-close" class="icon-button" aria-label="Close">×</button></div>
+    <form id="display-form" class="settings-section"><h3>Display name</h3><p>Shown in chat. It does not need to be unique.</p><div class="inline"><input data-relay-field name="displayName" required><button class="secondary">Save</button></div><div class="form-error"></div></form>
+    <form id="username-form" class="settings-section"><h3>Username</h3><p>Unique and changeable once every seven days. Confirm with your password.</p><label>New username<input data-relay-field name="username" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text" minlength="3" maxlength="32" pattern="[a-z0-9_]+" required></label><label>Current password<input data-relay-field name="password" type="password" autocomplete="current-password" required></label><div class="form-error"></div><button class="secondary">Change username</button></form>
+    <form id="password-form" class="settings-section"><h3>Password</h3><label>Current password<input data-relay-field name="currentPassword" type="password" autocomplete="current-password" required></label><div class="two"><label>New password<input data-relay-field name="newPassword" type="password" autocomplete="new-password" required></label><label>Confirm password<input data-relay-field name="newPasswordConfirmation" type="password" autocomplete="new-password" required></label></div><div class="form-error"></div><button class="secondary">Change password</button></form>
+    <button id="logout-button" class="danger" type="button">Sign out</button>
+  </dialog>
+  <noscript>Relay requires JavaScript.</noscript>
+  <script src="/app.js?v=0.7.0" type="module"></script>
+</body>
+</html>

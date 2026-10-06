@@ -1,0 +1,9 @@
+[
+  {
+    "Protocol": "TCP",
+    "Port": 8080,
+    "Ref": "ServerPort",
+    "Name": "Relay Web Port",
+    "Description": "HTTP and WebSocket traffic for the Relay web application"
+  }
+]

@@ -1,0 +1,16 @@
+export const state = {
+  account: null,
+  bootstrap: null,
+  socket: null,
+  reconnectTimer: null,
+  reconnectDelay: 1000,
+  closing: false,
+  messageIds: new Set(),
+  destination: "home",
+  friendsTab: "online",
+  activeConversation: null,
+  friends: [],
+  requests: {incoming: [], outgoing: []},
+  directConversations: [],
+  history: {hasMore: false, nextBefore: 0, loading: false},
+};
