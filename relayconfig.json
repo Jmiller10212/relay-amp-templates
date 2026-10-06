@@ -569,6 +569,19 @@
     "EnumValues": {"False":"false","True":"true"}
   },
   {
+    "DisplayName": "Enable Direct Messages Module",
+    "Category": "Relay:forum",
+    "Subcategory": "Modules:extension:7",
+    "Description": "Provides canonical one-to-one conversations, retained history, and persistent unread state. Requires persistence, accounts, realtime, friends, and chat.",
+    "Keywords": "module,direct messages,dm,unread",
+    "FieldName": "ModuleDirectMessages",
+    "InputType": "checkbox",
+    "ParamFieldName": "$.modules.direct_messages",
+    "IncludeInCommandLine": false,
+    "DefaultValue": "true",
+    "EnumValues": {"False":"false","True":"true"}
+  },
+  {
     "DisplayName": "Enable Chat Module",
     "Category": "Relay:forum",
     "Subcategory": "Modules:extension:7",
