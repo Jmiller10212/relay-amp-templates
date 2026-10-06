@@ -1,13 +1,13 @@
-import {api} from "/api.js?v=0.7.1";
-import {state} from "/state.js?v=0.7.1";
-import {RelayRealtime} from "/realtime.js?v=0.7.1";
-import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.1";
-import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.1";
-import {renderAccount} from "/settings.js?v=0.7.1";
-import {createFriendsUI} from "/friends.js?v=0.7.1";
-import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.1";
-import {createNavigation} from "/navigation.js?v=0.7.1";
-import {createServersUI} from "/servers.js?v=0.7.1";
+import {api} from "/api.js?v=0.7.2";
+import {state} from "/state.js?v=0.7.2";
+import {RelayRealtime} from "/realtime.js?v=0.7.2";
+import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.2";
+import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.2";
+import {renderAccount} from "/settings.js?v=0.7.2";
+import {createFriendsUI} from "/friends.js?v=0.7.2";
+import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.2";
+import {createNavigation} from "/navigation.js?v=0.7.2";
+import {createServersUI} from "/servers.js?v=0.7.2";
 
 const $ = (selector) => document.querySelector(selector);
 const authShell = $("#auth-shell");
@@ -31,6 +31,7 @@ serverUI = createServersUI($, friendsUI, showNotice, navigation, activateConvers
 
 function showNotice(text, kind = "info") {
   const target = authShell.hidden ? appNotice : authNotice;
+  target.onclick = null; target.onkeydown = null; target.removeAttribute("role"); target.removeAttribute("tabindex");
   target.textContent = text;
   target.className = `notice ${target === appNotice ? "app-notice " : ""}${kind}`;
   target.hidden = !text;
@@ -93,6 +94,7 @@ function showHomeFriends() {
   state.destination = "home";
   state.activeConversation = null;
   navigation.destination("home");
+  serverUI.deactivateChannel();
   navigation.friends();
   friendsUI.render();
   dmUI.render();
@@ -101,11 +103,16 @@ function showHomeFriends() {
 async function showLobby() {
   state.destination = "lobby";
   navigation.destination("lobby");
+  serverUI.deactivateChannel();
   await activateConversation({id: state.bootstrap.globalLobby.id, kind: "global", name: state.bootstrap.globalLobby.name, canSend: true});
 }
 
-async function activateConversation(conversation) {
+async function activateConversation(conversation, options = {}) {
   state.activeConversation = conversation;
+  const channelConversation = conversation.kind === "channel";
+  $("#server-channel-tools").hidden = !channelConversation;
+  $("#conversation-view").classList.toggle("can-pin", channelConversation && serverUI.selected()?.role === "owner");
+  if (!channelConversation) serverUI.deactivateChannel();
   if (conversation.kind === "direct") {
     state.destination = "home";
     navigation.destination("home");
@@ -129,7 +136,8 @@ async function activateConversation(conversation) {
     navigation.conversation(`# ${conversation.name}`);
   }
   dmUI.render();
-  await loadHistory();
+  if (options.targetMessageId) await loadMessageContext(options.targetMessageId);
+  else await loadHistory();
 }
 
 function setComposerEnabled(enabled) {
@@ -146,7 +154,25 @@ async function loadHistory() {
   state.history = {hasMore: Boolean(result.hasMore), nextBefore: result.nextBefore || 0, loading: false};
   loadEarlier.hidden = !state.history.hasMore;
   messages.scrollTop = messages.scrollHeight;
+  syncPinButtons();
   await markReadIfVisible();
+}
+
+async function loadMessageContext(messageID) {
+  if (!state.activeConversation) return;
+  state.messageIds.clear(); messages.replaceChildren(loadEarlier); loadEarlier.hidden = true;
+  const result = await api(`/api/v1/conversations/${encodeURIComponent(state.activeConversation.id)}/messages/${encodeURIComponent(messageID)}/context`, {headers: {}});
+  (result.messages || []).forEach((message) => addMessage(messages, state.messageIds, message, {scroll: false}));
+  state.history = {hasMore: false, nextBefore: 0, loading: false}; syncPinButtons();
+  const target = messages.querySelector(`[data-message-id="${CSS.escape(String(messageID))}"]`);
+  if (target) { target.classList.add("target-message"); target.scrollIntoView({block: "center"}); setTimeout(() => target.classList.remove("target-message"), 3300); }
+}
+
+function syncPinButtons() {
+  messages.querySelectorAll("[data-pin-message]").forEach((button) => {
+    const pinned = serverUI.isPinned(Number(button.dataset.pinMessage));
+    button.classList.toggle("pinned", pinned); button.title = pinned ? "Unpin message" : "Pin message"; button.setAttribute("aria-label", button.title);
+  });
 }
 
 async function loadOlderHistory() {
@@ -156,6 +182,7 @@ async function loadOlderHistory() {
   try {
     const result = await api(`/api/v1/conversations/${encodeURIComponent(state.activeConversation.id)}/messages?limit=50&before=${state.history.nextBefore}`, {headers: {}});
     prependMessages(messages, state.messageIds, result.messages, loadEarlier.nextSibling);
+    syncPinButtons();
     state.history.hasMore = Boolean(result.hasMore);
     state.history.nextBefore = result.nextBefore || 0;
     loadEarlier.hidden = !state.history.hasMore;
@@ -196,18 +223,37 @@ async function handleRealtime(event) {
     if (message.conversationId === state.activeConversation?.id) {
       const nearBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 80;
       addMessage(messages, state.messageIds, message, {scroll: nearBottom});
+      syncPinButtons();
       if (nearBottom) await markReadIfVisible();
     }
+    if (event.data?.serverId && message.userId !== state.account?.profile?.id && (message.conversationId !== state.activeConversation?.id || document.visibilityState !== "visible")) await showChannelAlert(message);
     if (!event.data?.serverId && message.conversationId !== state.bootstrap?.globalLobby?.id) await refreshDirectState();
   } else if (event.type === "presence.changed" || event.type === "profile.updated") {
-    await refreshPresence(); await refreshSocialState();
+    await refreshPresence(); await refreshSocialState(); await serverUI.handleRealtime(event);
   } else if (event.type.startsWith("friend.") || event.type.startsWith("friendship.")) {
     await refreshSocialState();
   } else if (event.type === "conversation.created" || event.type === "conversation.unread_updated") {
     await refreshDirectState();
   } else if (event.type.startsWith("server.") || event.type === "channel.created") {
+    await serverUI.handleRealtime(event);
     await refreshServerState();
+  } else if (event.type === "channel.pin.created" || event.type === "channel.pin.removed") {
+    await serverUI.handleRealtime(event); syncPinButtons();
   } else if (event.type === "error") showNotice(event.data?.message || "Realtime error", "error");
+}
+
+async function showChannelAlert(message) {
+  const entry = serverUI.channelForConversation(message.conversationId); if (!entry) return;
+  let mode = "mentions";
+  try { mode = await serverUI.notificationModeForConversation(message.conversationId); } catch (_) { return; }
+  const mentioned = message.text.toLocaleLowerCase().includes(`@${state.account.profile.username.toLocaleLowerCase()}`);
+  if (mode === "nothing" || (mode === "mentions" && !mentioned)) return;
+  const text = `${message.displayName || message.username} in ${entry.server.name} #${entry.channel.name}: ${message.text}`;
+  appNotice.textContent = text; appNotice.className = "notice app-notice info clickable"; appNotice.hidden = false;
+  appNotice.setAttribute("role", "button"); appNotice.tabIndex = 0;
+  const open = () => serverUI.open(entry.server.id, {targetMessageId: message.id});
+  appNotice.onclick = open; appNotice.onkeydown = (event) => { if (event.key === "Enter" || event.key === " ") open(); };
+  setTimeout(() => { if (appNotice.textContent === text) appNotice.hidden = true; }, 8000);
 }
 
 async function refreshSocialState() {
@@ -276,13 +322,17 @@ $("#message-form").addEventListener("submit", async (event) => {
   input.disabled = true;
   try {
     const result = await api(`/api/v1/conversations/${encodeURIComponent(state.activeConversation.id)}/messages`, {method: "POST", body: JSON.stringify({text})});
-    addMessage(messages, state.messageIds, result.message); input.value = "";
+    addMessage(messages, state.messageIds, result.message); syncPinButtons(); input.value = "";
     if (state.activeConversation.kind === "direct") await refreshDirectState();
   } catch (error) { showNotice(error.message, "error"); }
   finally { input.disabled = !state.activeConversation?.canSend; input.focus(); }
 });
 
 loadEarlier.addEventListener("click", loadOlderHistory);
+messages.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-pin-message]"); if (!button) return;
+  try { await serverUI.togglePin(Number(button.dataset.pinMessage)); syncPinButtons(); } catch (error) { showNotice(error.message, "error"); }
+});
 messages.addEventListener("scroll", () => { if (messages.scrollTop < 32 && state.history.hasMore) loadOlderHistory(); markReadIfVisible(); });
 document.addEventListener("visibilitychange", markReadIfVisible);
 $("#rail-home").addEventListener("click", () => { if (state.destination === "home" && state.activeConversation?.kind === "direct") activateConversation(state.activeConversation); else showHomeFriends(); });

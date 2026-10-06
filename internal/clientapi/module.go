@@ -24,6 +24,7 @@ type Authenticator interface {
 type Store interface {
 	Conversation(context.Context, string) (model.Conversation, error)
 	RecentConversation(context.Context, string, int64, int) ([]model.Message, error)
+	MessageContext(context.Context, string, int64, int) ([]model.Message, error)
 	InsertConversation(context.Context, string, string, string, string, string, string) (model.Message, error)
 	FriendRequests(context.Context, string) ([]model.FriendRequest, error)
 }
@@ -101,7 +102,35 @@ func (m *Module) RegisterHTTP(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/bootstrap", m.bootstrap)
 	mux.HandleFunc("GET /api/v1/presence", m.presence)
 	mux.HandleFunc("GET /api/v1/conversations/{id}/messages", m.messages)
+	mux.HandleFunc("GET /api/v1/conversations/{id}/messages/{messageId}/context", m.messageContext)
 	mux.HandleFunc("POST /api/v1/conversations/{id}/messages", m.send)
+}
+
+func (m *Module) messageContext(w http.ResponseWriter, r *http.Request) {
+	p, ok := m.principal(w, r)
+	if !ok {
+		return
+	}
+	conversationID := r.PathValue("id")
+	if _, err := m.access(r.Context(), conversationID, p.User.ID, false); err != nil {
+		api.WriteError(w, 404, "conversation_not_found", "Conversation not found.", "")
+		return
+	}
+	messageID, err := strconv.ParseInt(r.PathValue("messageId"), 10, 64)
+	if err != nil || messageID < 1 {
+		api.WriteError(w, 400, "invalid_message", "Message identifier is invalid.", "messageId")
+		return
+	}
+	items, err := m.store.MessageContext(r.Context(), conversationID, messageID, 20)
+	if errors.Is(err, persistence.ErrConversationNotFound) {
+		api.WriteError(w, 404, "message_not_found", "Message not found.", "")
+		return
+	}
+	if err != nil {
+		api.WriteError(w, 500, "database_error", "Relay could not load that message.", "")
+		return
+	}
+	api.WriteJSON(w, 200, map[string]any{"messages": items, "targetMessageId": messageID})
 }
 
 func (m *Module) principal(w http.ResponseWriter, r *http.Request) (accounts.Principal, bool) {

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#11131a">
   <title>Relay</title>
-  <link rel="stylesheet" href="/styles.css?v=0.7.1">
-  <link rel="stylesheet" href="/friends.css?v=0.7.1">
+  <link rel="stylesheet" href="/styles.css?v=0.7.2">
+  <link rel="stylesheet" href="/friends.css?v=0.7.2">
 </head>
 <body>
   <main id="auth-shell" class="auth-shell">
@@ -83,13 +83,15 @@
         <section class="people"><div class="section-title"><span>Online</span><span id="online-count">0</span></div><ul id="user-list"></ul></section>
       </section>
       <section id="server-context" class="context-view" hidden>
-        <div class="context-brand server-brand"><span id="server-context-mark" class="brand-mark">S</span><div><strong id="server-context-name">Server</strong><small>Relay server</small></div></div>
-        <div class="section-title"><span>Text Channels</span></div>
+        <button id="server-menu-button" class="server-menu-button" type="button" aria-haspopup="menu" aria-expanded="false"><strong id="server-context-name">Server</strong><span aria-hidden="true">⌄</span></button>
+        <div id="server-menu" class="server-menu" role="menu" hidden>
+          <button id="server-menu-invite" type="button" role="menuitem"><span aria-hidden="true">＋</span>Invite People</button>
+          <button id="server-menu-settings" type="button" role="menuitem"><span aria-hidden="true">⚙</span>Server Settings</button>
+          <div class="menu-separator"></div>
+          <button id="server-menu-leave" class="menu-danger" type="button" role="menuitem"><span aria-hidden="true">↪</span>Leave Server</button>
+        </div>
+        <div class="section-title channel-section-title"><span>Text Channels</span><button id="future-channel-button" type="button" disabled title="Channel creation is coming in Relay 0.8.0" aria-label="Channel creation is coming in Relay 0.8.0">+</button></div>
         <button id="server-general-button" class="context-destination active" type="button"><span># general</span></button>
-        <div class="sidebar-divider"></div>
-        <button id="server-members-button" class="context-destination" type="button"><span>Members</span></button>
-        <button id="server-invite-button" class="context-destination" type="button"><span>Invite People</span></button>
-        <button id="server-settings-button" class="context-destination" type="button"><span>Server Settings</span></button>
       </section>
       <button id="account-button" class="identity" type="button"><span id="avatar">?</span><div><strong id="current-user"></strong><small id="current-handle"></small></div><i id="connection-dot"></i></button>
     </aside>
@@ -112,12 +114,19 @@
       </section>
 
       <section id="conversation-view" class="conversation-view" hidden>
-        <header class="conversation-header"><div><strong id="conversation-title"># general</strong><span id="conversation-subtitle">The shared Relay room</span></div><span id="conversation-presence" class="pill offline" hidden>Offline</span></header>
+        <header class="conversation-header"><div class="conversation-heading"><strong id="conversation-title"># general</strong><span id="conversation-subtitle">The shared Relay room</span></div><span id="conversation-presence" class="pill offline" hidden>Offline</span><div id="server-channel-tools" class="channel-tools" hidden>
+          <button id="channel-notifications-button" class="toolbar-button" type="button" title="Notification Settings" aria-label="Notification Settings">◉</button>
+          <button id="channel-pins-button" class="toolbar-button" type="button" title="Pinned Messages" aria-label="Pinned Messages">◆</button>
+          <button id="member-panel-button" class="toolbar-button" type="button" title="Show Member List" aria-label="Show Member List" aria-pressed="false">♟</button>
+          <form id="server-search-form" class="server-search"><label><span class="sr-only">Search this server</span><input id="server-search-input" autocomplete="off" placeholder="Search server"></label><button type="submit" aria-label="Search">⌕</button></form>
+        </div></header>
         <div id="read-only-banner" class="read-only-banner" hidden>This conversation is read-only because you are no longer friends.</div>
         <div id="messages" class="messages" aria-live="polite"><button id="load-earlier" class="load-earlier" type="button" hidden>Load earlier messages</button></div>
         <form id="message-form" class="composer"><label class="sr-only" for="message-input">Message</label><input id="message-input" maxlength="2000" autocomplete="off" placeholder="Message #general"><button type="submit">Send</button></form>
+        <aside id="server-search-panel" class="tool-panel search-panel" aria-label="Server search" hidden><div class="tool-panel-head"><div><strong>Search this server</strong><small id="search-scope-copy"></small></div><button id="server-search-close" type="button" aria-label="Close search">×</button></div><div id="server-search-help" class="search-help"><p>Search message text or use filters:</p><button type="button" data-search-token="from:">from:username</button><button type="button" data-search-token="in:">in:channel</button><button type="button" data-search-token="mentions:">mentions:username</button></div><div id="server-search-suggestions" class="search-suggestions"></div><div id="server-search-status" class="tool-status" role="status"></div><div id="server-search-results" class="search-results"></div><button id="server-search-more" class="secondary compact" type="button" hidden>More results</button></aside>
       </section>
     </section>
+    <aside id="member-panel" class="member-panel" aria-label="Server members" hidden><div class="member-panel-head"><strong>Members</strong><button id="member-panel-close" type="button" aria-label="Hide Member List">×</button></div><div id="member-panel-content" class="member-panel-content"></div></aside>
   </main>
 
   <dialog id="new-dm-dialog" class="compact-dialog">
@@ -142,16 +151,22 @@
     <label class="list-search modal-search"><span class="sr-only">Search friends</span><input id="server-invite-search" placeholder="Search friends"></label><div id="server-invite-friends" class="modal-friend-list"></div>
   </dialog>
 
-  <dialog id="server-members-dialog">
-    <div class="dialog-head"><div><h2>Server Members</h2><p id="server-members-copy"></p></div><button class="icon-button" data-close-dialog="server-members-dialog" aria-label="Close">×</button></div><div id="server-members-list" class="friend-list settings-section"></div>
-  </dialog>
-
   <dialog id="server-settings-dialog">
     <div class="dialog-head"><div><h2>Server Settings</h2><p id="server-settings-name"></p></div><button class="icon-button" data-close-dialog="server-settings-dialog" aria-label="Close">×</button></div>
     <form id="server-rename-form" class="settings-section"><h3>Server name</h3><div class="inline"><input name="name" maxlength="100" required><button class="secondary">Save</button></div><div class="form-error"></div></form>
+    <section id="server-member-management" class="settings-section"><h3>Member management</h3><div id="server-settings-members" class="settings-member-list"></div></section>
     <form id="server-transfer-form" class="settings-section"><h3>Transfer ownership</h3><p>The new owner must already be a member.</p><select name="userId" required></select><label class="check"><input name="confirm" type="checkbox" required> I understand that I will become a member.</label><button class="secondary">Transfer</button><div class="form-error"></div></form>
     <section class="settings-section"><h3>Leave server</h3><button id="server-leave-button" class="danger compact" type="button">Leave Server</button></section>
     <form id="server-delete-form" class="settings-section"><h3>Delete server</h3><p>This permanently deletes its channel and messages. Enter the exact server name.</p><input name="name" required><button class="danger compact">Delete Server</button><div class="form-error"></div></form>
+  </dialog>
+
+  <dialog id="channel-pins-dialog" class="channel-tool-dialog">
+    <div class="dialog-head"><div><h2>Pinned Messages</h2><p>Messages saved for this channel.</p></div><button class="icon-button" data-close-dialog="channel-pins-dialog" aria-label="Close">×</button></div><div id="channel-pins-list" class="channel-tool-list"></div>
+  </dialog>
+
+  <dialog id="channel-notifications-dialog" class="compact-dialog">
+    <div class="dialog-head"><div><h2>Notification Settings</h2><p>Choose when Relay shows an in-app alert.</p></div><button class="icon-button" data-close-dialog="channel-notifications-dialog" aria-label="Close">×</button></div>
+    <form id="channel-notifications-form" class="settings-section notification-options"><label><input type="radio" name="mode" value="all"> <span><strong>All Messages</strong><small>Alert for every message while this channel is not open.</small></span></label><label><input type="radio" name="mode" value="mentions"> <span><strong>Mentions Only</strong><small>Alert for literal mentions of your current @username.</small></span></label><label><input type="radio" name="mode" value="nothing"> <span><strong>Nothing</strong><small>Do not show message alerts for this channel.</small></span></label><div class="dialog-actions"><button class="primary" type="submit">Save</button></div></form>
   </dialog>
 
   <dialog id="settings-dialog">
@@ -162,6 +177,6 @@
     <button id="logout-button" class="danger" type="button">Sign out</button>
   </dialog>
   <noscript>Relay requires JavaScript.</noscript>
-  <script src="/app.js?v=0.7.1" type="module"></script>
+  <script src="/app.js?v=0.7.2" type="module"></script>
 </body>
 </html>

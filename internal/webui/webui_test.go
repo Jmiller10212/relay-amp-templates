@@ -83,12 +83,12 @@ func TestReleaseAssetsUseOneCacheBustingVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"/styles.css?v=0.7.1", "/friends.css?v=0.7.1", "/app.js?v=0.7.1"} {
+	for _, want := range []string{"/styles.css?v=0.7.2", "/friends.css?v=0.7.2", "/app.js?v=0.7.2"} {
 		if !strings.Contains(string(html), want) {
 			t.Fatalf("missing versioned asset %s", want)
 		}
 	}
-	if strings.Count(string(app), "?v=0.7.1") != 10 {
+	if strings.Count(string(app), "?v=0.7.2") != 10 {
 		t.Fatal("all application module imports must share the release cache-busting version")
 	}
 }

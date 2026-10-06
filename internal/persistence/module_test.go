@@ -137,7 +137,7 @@ func TestV2MigrationClearsStaleReservationsAndCreatesBackup(t *testing.T) {
 	if err := m.ReserveRegistration(ctx, PendingRegistration{Nonce: "stale", EmailHash: "hash", AuthUserID: "decoy-id", Username: "stuck", DisplayName: "Stuck", ExpiresAt: time.Now().Add(24 * time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.db.ExecContext(ctx, `DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner; DROP TABLE servers; DROP INDEX conversation_reads_user; DROP TABLE conversation_reads; DROP INDEX direct_conversations_high; DROP INDEX direct_conversations_low; DROP TABLE direct_conversations; DROP INDEX friendships_high; DROP TABLE friendships; DROP INDEX friend_requests_recipient; DROP TABLE friend_requests; DROP INDEX messages_conversation_id; ALTER TABLE messages DROP COLUMN conversation_id; DROP TABLE conversations; DELETE FROM schema_migrations WHERE version>=3`); err != nil {
+	if _, err := m.db.ExecContext(ctx, `DROP TABLE channel_notification_preferences; DROP TABLE channel_pins; DROP INDEX messages_conversation_user_id; DROP INDEX server_channels_server_conversation; DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner; DROP TABLE servers; DROP INDEX conversation_reads_user; DROP TABLE conversation_reads; DROP INDEX direct_conversations_high; DROP INDEX direct_conversations_low; DROP TABLE direct_conversations; DROP INDEX friendships_high; DROP TABLE friendships; DROP INDEX friend_requests_recipient; DROP TABLE friend_requests; DROP INDEX messages_conversation_id; ALTER TABLE messages DROP COLUMN conversation_id; DROP TABLE conversations; DELETE FROM schema_migrations WHERE version>=3`); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.Stop(ctx); err != nil {
@@ -213,5 +213,39 @@ func TestMigrationFourBackfillsLegacyMessagesIntoGlobalLobby(t *testing.T) {
 	}
 	if len(messages) != 1 || messages[0].ID != 1 || messages[0].Text != "kept" || messages[0].ConversationID != model.GlobalConversationID {
 		t.Fatalf("legacy message changed: %+v", messages)
+	}
+}
+
+func TestMigrationNineCreatesChannelToolsAndBackup(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	m := New(dir)
+	if err := m.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.db.ExecContext(ctx, `DROP TABLE channel_notification_preferences; DROP TABLE channel_pins; DROP INDEX messages_conversation_user_id; DROP INDEX server_channels_server_conversation; DELETE FROM schema_migrations WHERE version=9`); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	m = New(dir)
+	if err := m.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer m.Stop(ctx)
+	var version int
+	if err := m.db.QueryRowContext(ctx, `SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != 9 {
+		t.Fatalf("version=%d err=%v", version, err)
+	}
+	for _, table := range []string{"channel_pins", "channel_notification_preferences"} {
+		var count int
+		if err := m.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&count); err != nil || count != 1 {
+			t.Fatalf("table %s count=%d err=%v", table, count, err)
+		}
+	}
+	backups, err := filepath.Glob(filepath.Join(dir, "relay.db.pre-v9-*.backup"))
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("migration 9 backups=%v err=%v", backups, err)
 	}
 }

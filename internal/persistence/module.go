@@ -86,7 +86,7 @@ func (m *Module) Init(ctx context.Context) error {
 	if err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&version); err != nil {
 		return err
 	}
-	const currentSchemaVersion = 8
+	const currentSchemaVersion = 9
 	if version >= 1 && version < currentSchemaVersion && existed {
 		if err := m.backup(ctx, dbPath, version+1); err != nil {
 			return fmt.Errorf("pre-migration backup: %w", err)
@@ -218,6 +218,25 @@ func (m *Module) Init(ctx context.Context) error {
 		{8, []string{
 			`ALTER TABLE servers ADD COLUMN name_key TEXT;`,
 			`CREATE UNIQUE INDEX servers_owner_name_key ON servers(owner_user_id,name_key) WHERE name_key IS NOT NULL;`,
+		}},
+		{9, []string{
+			`CREATE TABLE channel_pins (
+				channel_id TEXT NOT NULL REFERENCES server_channels(id) ON DELETE CASCADE,
+				message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+				pinned_by TEXT NOT NULL REFERENCES relay_users(auth_user_id) ON DELETE CASCADE,
+				pinned_at TEXT NOT NULL,
+				PRIMARY KEY(channel_id,message_id)
+			);`,
+			`CREATE INDEX channel_pins_channel_time ON channel_pins(channel_id,pinned_at DESC,message_id DESC);`,
+			`CREATE TABLE channel_notification_preferences (
+				channel_id TEXT NOT NULL REFERENCES server_channels(id) ON DELETE CASCADE,
+				user_id TEXT NOT NULL REFERENCES relay_users(auth_user_id) ON DELETE CASCADE,
+				mode TEXT NOT NULL CHECK(mode IN ('all','mentions','nothing')),
+				updated_at TEXT NOT NULL,
+				PRIMARY KEY(channel_id,user_id)
+			);`,
+			`CREATE INDEX messages_conversation_user_id ON messages(conversation_id,user_id,id DESC);`,
+			`CREATE INDEX server_channels_server_conversation ON server_channels(server_id,conversation_id);`,
 		}},
 	}
 	for _, migration := range migrations {
@@ -357,6 +376,38 @@ func (m *Module) RecentConversation(ctx context.Context, conversationID string, 
 		out[len(rev)-1-i] = rev[i]
 	}
 	return out, nil
+}
+
+func (m *Module) MessageContext(ctx context.Context, conversationID string, messageID int64, radius int) ([]model.Message, error) {
+	if radius < 1 {
+		radius = 20
+	}
+	before, err := m.RecentConversation(ctx, conversationID, messageID+1, radius+1)
+	if err != nil {
+		return nil, err
+	}
+	if len(before) == 0 || before[len(before)-1].ID != messageID {
+		return nil, ErrConversationNotFound
+	}
+	rows, err := m.db.QueryContext(ctx, `SELECT m.id,COALESCE(m.conversation_id,''),m.kind,COALESCE(m.user_id,''),m.username,COALESCE(u.display_name,m.username),m.text,m.created_at FROM messages m LEFT JOIN relay_users u ON u.auth_user_id=m.user_id WHERE m.conversation_id=? AND m.id>? ORDER BY m.id ASC LIMIT ?`, conversationID, messageID, radius)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := append([]model.Message{}, before...)
+	for rows.Next() {
+		var msg model.Message
+		var raw string
+		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.Kind, &msg.UserID, &msg.Username, &msg.DisplayName, &msg.Text, &raw); err != nil {
+			return nil, err
+		}
+		msg.CreatedAt, err = time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, msg)
+	}
+	return out, rows.Err()
 }
 
 func (m *Module) Conversation(ctx context.Context, id string) (model.Conversation, error) {

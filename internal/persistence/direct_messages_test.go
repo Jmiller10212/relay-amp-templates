@@ -110,7 +110,7 @@ func TestMigrationSixCreatesBackupAndPersistsDirectMessages(t *testing.T) {
 		}
 	}
 	makeFriends(t, store, ctx, "a", "b")
-	if _, err := store.db.ExecContext(ctx, `DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner; DROP TABLE servers; DROP INDEX conversation_reads_user; DROP TABLE conversation_reads; DROP INDEX direct_conversations_high; DROP INDEX direct_conversations_low; DROP TABLE direct_conversations; DELETE FROM schema_migrations WHERE version>=6`); err != nil {
+	if _, err := store.db.ExecContext(ctx, `DROP TABLE channel_notification_preferences; DROP TABLE channel_pins; DROP INDEX messages_conversation_user_id; DROP INDEX server_channels_server_conversation; DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner; DROP TABLE servers; DROP INDEX conversation_reads_user; DROP TABLE conversation_reads; DROP INDEX direct_conversations_high; DROP INDEX direct_conversations_low; DROP TABLE direct_conversations; DELETE FROM schema_migrations WHERE version>=6`); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Stop(ctx); err != nil {

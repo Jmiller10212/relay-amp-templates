@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -95,6 +96,35 @@ func TestServerHTTPMembershipLifecycle(t *testing.T) {
 	w = call("GET", "/api/v1/servers/"+created.Server.ID+"/members", "b", "")
 	if w.Code != 200 || strings.Contains(w.Body.String(), "private@example.test") {
 		t.Fatalf("members status=%d body=%s", w.Code, w.Body.String())
+	}
+	channel := created.Server.Channels[0]
+	message, err := store.InsertConversation(ctx, channel.ConversationID, "user", "a", "alice", "alice", "searchable @bob message")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w = call("GET", "/api/v1/servers/"+created.Server.ID+"/search?q=searchable&mentionsUserId=b", "b", "")
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "searchable @bob message") {
+		t.Fatalf("member search status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = call("GET", "/api/v1/servers/"+created.Server.ID+"/search?q=searchable", "c", "")
+	if w.Code != 404 {
+		t.Fatalf("outsider search status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = call("PUT", "/api/v1/channels/"+channel.ID+"/pins/"+strconv.FormatInt(message.ID, 10), "b", `{}`)
+	if w.Code != 403 {
+		t.Fatalf("member pin status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = call("PUT", "/api/v1/channels/"+channel.ID+"/pins/"+strconv.FormatInt(message.ID, 10), "a", `{}`)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "searchable @bob message") {
+		t.Fatalf("owner pin status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = call("GET", "/api/v1/channels/"+channel.ID+"/pins", "b", "")
+	if w.Code != 200 || strings.Contains(w.Body.String(), "private@example.test") {
+		t.Fatalf("pins status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = call("PUT", "/api/v1/channels/"+channel.ID+"/notification-preference", "b", `{"mode":"nothing"}`)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"mode":"nothing"`) {
+		t.Fatalf("notification preference status=%d body=%s", w.Code, w.Body.String())
 	}
 	w = call("PATCH", "/api/v1/servers/"+created.Server.ID, "b", `{"name":"Not Allowed"}`)
 	if w.Code != 404 {

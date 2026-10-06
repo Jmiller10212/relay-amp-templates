@@ -41,3 +41,21 @@ type ChannelAccess struct {
 	ServerID       string
 	MemberIDs      []string
 }
+
+type ServerSearchResult struct {
+	Message Message       `json:"message"`
+	Channel ServerChannel `json:"channel"`
+}
+
+type ChannelPin struct {
+	ChannelID string     `json:"channelId"`
+	Message   Message    `json:"message"`
+	PinnedBy  PublicUser `json:"pinnedBy"`
+	PinnedAt  time.Time  `json:"pinnedAt"`
+}
+
+type ChannelNotificationPreference struct {
+	ChannelID string    `json:"channelId"`
+	Mode      string    `json:"mode"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}

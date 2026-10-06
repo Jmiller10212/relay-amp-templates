@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"relay/internal/accounts"
 	"relay/internal/api"
@@ -37,6 +39,12 @@ type Store interface {
 	TransferServer(context.Context, string, string, string) error
 	DeleteServer(context.Context, string, string, string) error
 	ChannelAccess(context.Context, string, string) (model.ChannelAccess, error)
+	SearchServerMessages(context.Context, string, string, persistence.ServerSearchParams) ([]model.ServerSearchResult, error)
+	ChannelPins(context.Context, string, string) ([]model.ChannelPin, error)
+	PinChannelMessage(context.Context, string, int64, string) (model.ChannelPin, []string, error)
+	UnpinChannelMessage(context.Context, string, int64, string) ([]string, error)
+	ChannelNotificationPreference(context.Context, string, string) (model.ChannelNotificationPreference, error)
+	SetChannelNotificationPreference(context.Context, string, string, string) (model.ChannelNotificationPreference, error)
 }
 
 type Config struct{ NameMax, MaxOwned, MaxMemberships, InvitesPerHour int }
@@ -81,7 +89,13 @@ func (m *Module) RegisterHTTP(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/servers/{id}/ownership", m.transfer)
 	mux.HandleFunc("POST /api/v1/servers/{id}/leave", m.leave)
 	mux.HandleFunc("GET /api/v1/servers/{id}/channels", m.channels)
+	mux.HandleFunc("GET /api/v1/servers/{id}/search", m.search)
 	mux.HandleFunc("POST /api/v1/servers/{id}/invites", m.invite)
+	mux.HandleFunc("GET /api/v1/channels/{id}/pins", m.pins)
+	mux.HandleFunc("PUT /api/v1/channels/{id}/pins/{messageId}", m.pin)
+	mux.HandleFunc("DELETE /api/v1/channels/{id}/pins/{messageId}", m.unpin)
+	mux.HandleFunc("GET /api/v1/channels/{id}/notification-preference", m.notificationPreference)
+	mux.HandleFunc("PUT /api/v1/channels/{id}/notification-preference", m.setNotificationPreference)
 	mux.HandleFunc("GET /api/v1/server-invites", m.invites)
 	mux.HandleFunc("POST /api/v1/server-invites/{id}/accept", m.accept)
 	mux.HandleFunc("POST /api/v1/server-invites/{id}/decline", m.decline)
@@ -242,6 +256,150 @@ func (m *Module) members(w http.ResponseWriter, r *http.Request) {
 		items[i].Online = m.hub.IsOnline(items[i].User.ID)
 	}
 	api.WriteJSON(w, 200, map[string]any{"members": items})
+}
+
+func (m *Module) search(w http.ResponseWriter, r *http.Request) {
+	p, ok := m.principal(w, r)
+	if !ok {
+		return
+	}
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if utf8.RuneCountInString(q) > 200 {
+		api.WriteError(w, 400, "invalid_search", "Search text must be 200 characters or fewer.", "q")
+		return
+	}
+	limit := 25
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 || value > 50 {
+			api.WriteError(w, 400, "invalid_limit", "Limit must be between 1 and 50.", "limit")
+			return
+		}
+		limit = value
+	}
+	var before int64
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value < 1 {
+			api.WriteError(w, 400, "invalid_cursor", "Search cursor is invalid.", "before")
+			return
+		}
+		before = value
+	}
+	params := persistence.ServerSearchParams{Text: q, FromUserID: r.URL.Query().Get("fromUserId"), ChannelID: r.URL.Query().Get("channelId"), MentionsUserID: r.URL.Query().Get("mentionsUserId"), Before: before, Limit: limit + 1}
+	items, err := m.store.SearchServerMessages(r.Context(), r.PathValue("id"), p.User.ID, params)
+	if errors.Is(err, persistence.ErrServerNotFound) {
+		notFound(w)
+		return
+	}
+	if err != nil {
+		dbError(w)
+		return
+	}
+	hasMore := len(items) > limit
+	if hasMore {
+		items = items[:limit]
+	}
+	var nextBefore int64
+	if hasMore && len(items) > 0 {
+		nextBefore = items[len(items)-1].Message.ID
+	}
+	api.WriteJSON(w, 200, map[string]any{"results": items, "hasMore": hasMore, "nextBefore": nextBefore})
+}
+
+func (m *Module) pins(w http.ResponseWriter, r *http.Request) {
+	p, ok := m.principal(w, r)
+	if !ok {
+		return
+	}
+	items, err := m.store.ChannelPins(r.Context(), r.PathValue("id"), p.User.ID)
+	if err != nil {
+		api.WriteError(w, 404, "channel_not_found", "Channel not found.", "")
+		return
+	}
+	api.WriteJSON(w, 200, map[string]any{"pins": items})
+}
+
+func (m *Module) pin(w http.ResponseWriter, r *http.Request) {
+	p, ok := m.principal(w, r)
+	if !ok || !mutation(w, r) || !decodeEmpty(w, r) {
+		return
+	}
+	messageID, err := strconv.ParseInt(r.PathValue("messageId"), 10, 64)
+	if err != nil || messageID < 1 {
+		api.WriteError(w, 400, "invalid_message", "Message identifier is invalid.", "messageId")
+		return
+	}
+	item, audience, err := m.store.PinChannelMessage(r.Context(), r.PathValue("id"), messageID, p.User.ID)
+	if errors.Is(err, persistence.ErrOwnerRequired) {
+		api.WriteError(w, 403, "owner_required", "Only the server owner can manage pinned messages.", "")
+		return
+	}
+	if err != nil {
+		api.WriteError(w, 404, "message_not_found", "Message not found in this channel.", "")
+		return
+	}
+	m.hub.PublishUsers(audience, "channel.pin.created", map[string]any{"pin": item})
+	api.WriteJSON(w, 200, map[string]any{"pin": item})
+}
+
+func (m *Module) unpin(w http.ResponseWriter, r *http.Request) {
+	p, ok := m.principal(w, r)
+	if !ok || !mutation(w, r) {
+		return
+	}
+	messageID, err := strconv.ParseInt(r.PathValue("messageId"), 10, 64)
+	if err != nil || messageID < 1 {
+		api.WriteError(w, 400, "invalid_message", "Message identifier is invalid.", "messageId")
+		return
+	}
+	audience, err := m.store.UnpinChannelMessage(r.Context(), r.PathValue("id"), messageID, p.User.ID)
+	if errors.Is(err, persistence.ErrOwnerRequired) {
+		api.WriteError(w, 403, "owner_required", "Only the server owner can manage pinned messages.", "")
+		return
+	}
+	if err != nil {
+		api.WriteError(w, 404, "channel_not_found", "Channel not found.", "")
+		return
+	}
+	m.hub.PublishUsers(audience, "channel.pin.removed", map[string]any{"channelId": r.PathValue("id"), "messageId": messageID})
+	api.WriteJSON(w, 200, map[string]string{"status": "unpinned"})
+}
+
+func (m *Module) notificationPreference(w http.ResponseWriter, r *http.Request) {
+	p, ok := m.principal(w, r)
+	if !ok {
+		return
+	}
+	item, err := m.store.ChannelNotificationPreference(r.Context(), r.PathValue("id"), p.User.ID)
+	if err != nil {
+		api.WriteError(w, 404, "channel_not_found", "Channel not found.", "")
+		return
+	}
+	api.WriteJSON(w, 200, map[string]any{"preference": item})
+}
+
+func (m *Module) setNotificationPreference(w http.ResponseWriter, r *http.Request) {
+	p, ok := m.principal(w, r)
+	if !ok || !mutation(w, r) {
+		return
+	}
+	var in struct {
+		Mode string `json:"mode"`
+	}
+	if !api.DecodeJSON(w, r, &in) {
+		return
+	}
+	if in.Mode != "all" && in.Mode != "mentions" && in.Mode != "nothing" {
+		api.WriteError(w, 400, "invalid_notification_mode", "Choose all, mentions, or nothing.", "mode")
+		return
+	}
+	item, err := m.store.SetChannelNotificationPreference(r.Context(), r.PathValue("id"), p.User.ID, in.Mode)
+	if err != nil {
+		api.WriteError(w, 404, "channel_not_found", "Channel not found.", "")
+		return
+	}
+	api.WriteJSON(w, 200, map[string]any{"preference": item})
 }
 func (m *Module) invite(w http.ResponseWriter, r *http.Request) {
 	p, ok := m.principal(w, r)

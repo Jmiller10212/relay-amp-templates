@@ -23,6 +23,16 @@ function messageElement(message) {
   meta.append(strong, handle, time);
   body.append(meta, text);
   row.append(avatar, body);
+  if (message.kind === "user") {
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "message-pin-action";
+    pin.dataset.pinMessage = String(message.id);
+    pin.setAttribute("aria-label", "Pin message");
+    pin.title = "Pin message";
+    pin.textContent = "◆";
+    row.append(pin);
+  }
   return row;
 }
 

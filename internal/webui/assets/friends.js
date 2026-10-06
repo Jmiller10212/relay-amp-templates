@@ -1,4 +1,4 @@
-import {api} from "/api.js?v=0.7.1";
+import {api} from "/api.js?v=0.7.2";
 
 export function createFriendsUI(select, notify, openDirect) {
   let friends = [];

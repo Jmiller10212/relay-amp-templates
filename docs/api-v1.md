@@ -58,6 +58,12 @@ DM events are `conversation.created`, `message.created`, and `conversation.unrea
 
 `GET /api/v1/servers/{serverId}/channels` lists current channels. Version 0.7 creates only `#general`; channel administration is deferred. Channel history and sending use the common conversation routes and require current membership. Private-resource failures return non-enumerating `404` responses where appropriate.
 
+`GET /api/v1/servers/{serverId}/search` searches only messages in that server after verifying current membership. It accepts `q`, `fromUserId`, `channelId`, `mentionsUserId`, `before`, and `limit` (default 25, maximum 50). Results are newest first. Mention filtering is literal case-insensitive `@username` matching; Relay does not yet have structured mentions. `GET /api/v1/conversations/{conversationId}/messages/{messageId}/context` returns a bounded authorized neighborhood for result navigation.
+
+Members list pins with `GET /api/v1/channels/{channelId}/pins`. Only the server owner can add or remove them through `PUT` or `DELETE /api/v1/channels/{channelId}/pins/{messageId}`. Pins reference the original message rather than copying it. Realtime events `channel.pin.created` and `channel.pin.removed` are routed only to current server members.
+
+`GET` and `PUT /api/v1/channels/{channelId}/notification-preference` read or set the caller's private `all`, `mentions`, or `nothing` mode. These modes control embedded-client in-app alerts only; they never suppress delivery or history.
+
 Members invite a current Relay friend through `POST /api/v1/servers/{serverId}/invites` with `{"userId":"..."}`. `GET /api/v1/server-invites` lists the caller's incoming invitations. Accept and decline use `POST /api/v1/server-invites/{inviteId}/accept` and `/decline`; the inviter or server owner cancels with `DELETE /api/v1/server-invites/{inviteId}`. Pending invitations remain valid if the friendship later ends.
 
 Server realtime events are `server.created`, `server.updated`, `server.deleted`, `server.invite.created`, `server.invite.removed`, `server.membership.changed`, and `channel.created`. State is sent only to current members or the specifically affected invitee. Channel `message.created` events are targeted to current members and include `serverId` for routing.

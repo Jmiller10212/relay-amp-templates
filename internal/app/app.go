@@ -22,7 +22,7 @@ import (
 	"relay/internal/webui"
 )
 
-var Version = "0.7.1-dev"
+var Version = "0.7.2-dev"
 
 type App struct {
 	cfg     config.Config

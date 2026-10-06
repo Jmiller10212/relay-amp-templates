@@ -91,7 +91,7 @@ func TestMigrationSevenCreatesBackup(t *testing.T) {
 	if err := store.Init(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.db.ExecContext(ctx, `DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner_name_key; DROP INDEX servers_owner; DROP TABLE servers; DELETE FROM schema_migrations WHERE version>=7`); err != nil {
+	if _, err := store.db.ExecContext(ctx, `DROP TABLE channel_notification_preferences; DROP TABLE channel_pins; DROP INDEX messages_conversation_user_id; DROP INDEX server_channels_server_conversation; DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner_name_key; DROP INDEX servers_owner; DROP TABLE servers; DELETE FROM schema_migrations WHERE version>=7`); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Stop(ctx); err != nil {
@@ -120,7 +120,7 @@ func TestMigrationEightCreatesBackupAndPreservesDuplicateNames(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := store.db.ExecContext(ctx, `DROP INDEX servers_owner_name_key; ALTER TABLE servers DROP COLUMN name_key; INSERT INTO servers(id,name,owner_user_id,created_at,updated_at) VALUES('legacy-a','Duplicate','owner','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),('legacy-b','duplicate','owner','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'); DELETE FROM schema_migrations WHERE version=8`); err != nil {
+	if _, err := store.db.ExecContext(ctx, `DROP TABLE channel_notification_preferences; DROP TABLE channel_pins; DROP INDEX messages_conversation_user_id; DROP INDEX server_channels_server_conversation; DROP INDEX servers_owner_name_key; ALTER TABLE servers DROP COLUMN name_key; INSERT INTO servers(id,name,owner_user_id,created_at,updated_at) VALUES('legacy-a','Duplicate','owner','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),('legacy-b','duplicate','owner','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'); DELETE FROM schema_migrations WHERE version>=8`); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Stop(ctx); err != nil {
