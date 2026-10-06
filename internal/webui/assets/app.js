@@ -1,13 +1,13 @@
-import {api} from "/api.js?v=0.7.0";
-import {state} from "/state.js?v=0.7.0";
-import {RelayRealtime} from "/realtime.js?v=0.7.0";
-import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.0";
-import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.0";
-import {renderAccount} from "/settings.js?v=0.7.0";
-import {createFriendsUI} from "/friends.js?v=0.7.0";
-import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.0";
-import {createNavigation} from "/navigation.js?v=0.7.0";
-import {createServersUI} from "/servers.js?v=0.7.0";
+import {api} from "/api.js?v=0.7.1";
+import {state} from "/state.js?v=0.7.1";
+import {RelayRealtime} from "/realtime.js?v=0.7.1";
+import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.1";
+import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.1";
+import {renderAccount} from "/settings.js?v=0.7.1";
+import {createFriendsUI} from "/friends.js?v=0.7.1";
+import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.1";
+import {createNavigation} from "/navigation.js?v=0.7.1";
+import {createServersUI} from "/servers.js?v=0.7.1";
 
 const $ = (selector) => document.querySelector(selector);
 const authShell = $("#auth-shell");

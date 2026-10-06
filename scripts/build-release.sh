@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-version="${1:-0.7.0}"
+version="${1:-0.7.1}"
 mkdir -p dist
 
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \

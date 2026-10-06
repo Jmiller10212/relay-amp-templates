@@ -70,6 +70,14 @@ func TestServerHTTPMembershipLifecycle(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
+	w = call("POST", "/api/v1/servers", "a", `{"name":"test server"}`)
+	if w.Code != 409 || !strings.Contains(w.Body.String(), "server_name_taken") {
+		t.Fatalf("duplicate create status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = call("POST", "/api/v1/servers", "c", `{"name":"TEST SERVER"}`)
+	if w.Code != 201 {
+		t.Fatalf("different owner matching name status=%d body=%s", w.Code, w.Body.String())
+	}
 	w = call("POST", "/api/v1/servers/"+created.Server.ID+"/invites", "a", `{"userId":"b"}`)
 	if w.Code != 201 {
 		t.Fatalf("invite status=%d body=%s", w.Code, w.Body.String())

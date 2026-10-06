@@ -34,6 +34,12 @@ func TestServerLifecycleAndChannelAuthorization(t *testing.T) {
 	if server.Role != "owner" || len(server.Channels) != 1 || server.Channels[0].Name != "general" {
 		t.Fatalf("server=%+v", server)
 	}
+	if _, err = store.CreateServer(ctx, "server-duplicate", "conversation-duplicate", "channel-duplicate", "a", "test server", 20, 100); !errors.Is(err, ErrServerNameTaken) {
+		t.Fatalf("same-owner duplicate name=%v", err)
+	}
+	if _, err = store.CreateServer(ctx, "server-other-owner", "conversation-other-owner", "channel-other-owner", "c", "TEST SERVER", 20, 100); err != nil {
+		t.Fatalf("different-owner matching name=%v", err)
+	}
 	if _, err = store.ChannelAccess(ctx, "conversation-1", "c"); !errors.Is(err, ErrConversationNotFound) {
 		t.Fatalf("outsider access=%v", err)
 	}
@@ -85,7 +91,7 @@ func TestMigrationSevenCreatesBackup(t *testing.T) {
 	if err := store.Init(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.db.ExecContext(ctx, `DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner; DROP TABLE servers; DELETE FROM schema_migrations WHERE version=7`); err != nil {
+	if _, err := store.db.ExecContext(ctx, `DROP INDEX server_channels_server; DROP TABLE server_channels; DROP INDEX server_invite_log_inviter; DROP TABLE server_invite_log; DROP INDEX server_invites_inviter; DROP INDEX server_invites_invitee; DROP TABLE server_invites; DROP INDEX server_members_user; DROP TABLE server_members; DROP INDEX servers_owner_name_key; DROP INDEX servers_owner; DROP TABLE servers; DELETE FROM schema_migrations WHERE version>=7`); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.Stop(ctx); err != nil {
@@ -99,6 +105,42 @@ func TestMigrationSevenCreatesBackup(t *testing.T) {
 	backups, err := filepath.Glob(filepath.Join(dir, "relay.db.pre-v7-*.backup"))
 	if err != nil || len(backups) != 1 {
 		t.Fatalf("backups=%v err=%v", backups, err)
+	}
+}
+
+func TestMigrationEightCreatesBackupAndPreservesDuplicateNames(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	store := New(dir)
+	if err := store.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, user := range []struct{ id, username string }{{"owner", "owner"}} {
+		if _, err := store.CreateProfile(ctx, user.id, user.username, user.username); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := store.db.ExecContext(ctx, `DROP INDEX servers_owner_name_key; ALTER TABLE servers DROP COLUMN name_key; INSERT INTO servers(id,name,owner_user_id,created_at,updated_at) VALUES('legacy-a','Duplicate','owner','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),('legacy-b','duplicate','owner','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'); DELETE FROM schema_migrations WHERE version=8`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	store = New(dir)
+	if err := store.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer store.Stop(ctx)
+	backups, err := filepath.Glob(filepath.Join(dir, "relay.db.pre-v8-*.backup"))
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("backups=%v err=%v", backups, err)
+	}
+	var count int
+	if err = store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM servers WHERE owner_user_id='owner'`).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("legacy duplicates count=%d err=%v", count, err)
+	}
+	if _, err = store.CreateServer(ctx, "new", "new-conversation", "new-channel", "owner", "DUPLICATE", 20, 100); !errors.Is(err, ErrServerNameTaken) {
+		t.Fatalf("new duplicate after migration=%v", err)
 	}
 }
 

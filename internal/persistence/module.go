@@ -27,6 +27,7 @@ var ErrConversationNotFound = errors.New("conversation was not found")
 var ErrFriendshipRequired = errors.New("active friendship is required")
 var ErrInvalidReadCursor = errors.New("read cursor does not belong to the conversation")
 var ErrServerNotFound = errors.New("server was not found")
+var ErrServerNameTaken = errors.New("you already own a server with that name")
 var ErrServerLimit = errors.New("server limit reached")
 var ErrMembershipLimit = errors.New("membership limit reached")
 var ErrOwnerRequired = errors.New("server owner permission required")
@@ -85,7 +86,7 @@ func (m *Module) Init(ctx context.Context) error {
 	if err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version),0) FROM schema_migrations`).Scan(&version); err != nil {
 		return err
 	}
-	const currentSchemaVersion = 7
+	const currentSchemaVersion = 8
 	if version >= 1 && version < currentSchemaVersion && existed {
 		if err := m.backup(ctx, dbPath, version+1); err != nil {
 			return fmt.Errorf("pre-migration backup: %w", err)
@@ -210,6 +211,13 @@ func (m *Module) Init(ctx context.Context) error {
 				UNIQUE(server_id,name COLLATE NOCASE)
 			);`,
 			`CREATE INDEX server_channels_server ON server_channels(server_id,position,id);`,
+		}},
+		// Existing duplicate names are intentionally preserved. Their name_key
+		// remains NULL, while all new and renamed servers receive a canonical
+		// key and are protected by this unique index.
+		{8, []string{
+			`ALTER TABLE servers ADD COLUMN name_key TEXT;`,
+			`CREATE UNIQUE INDEX servers_owner_name_key ON servers(owner_user_id,name_key) WHERE name_key IS NOT NULL;`,
 		}},
 	}
 	for _, migration := range migrations {

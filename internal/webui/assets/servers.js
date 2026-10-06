@@ -1,4 +1,4 @@
-import {api} from "/api.js?v=0.7.0";
+import {api} from "/api.js?v=0.7.1";
 
 export function createServersUI(select, friendsUI, notify, navigation, activateConversation) {
   let servers = [];
@@ -112,7 +112,20 @@ export function createServersUI(select, friendsUI, notify, navigation, activateC
   select("#server-invite-button").addEventListener("click", showInvite); select("#server-invite-search").addEventListener("input", showInvite);
   select("#server-settings-button").addEventListener("click", () => showSettings().catch((error) => notify(error.message, "error")));
   document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => select(`#${button.dataset.closeDialog}`).close()));
-  select("#server-create-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const result = await api("/api/v1/servers", {method: "POST", body: JSON.stringify({name: event.currentTarget.elements.name.value})}); event.currentTarget.reset(); select("#server-create-dialog").close(); await load(); await open(result.server.id); } catch (error) { notify(error.message, "error"); } });
+  select("#server-create-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = form.elements.name.value;
+    try {
+      const result = await api("/api/v1/servers", {method: "POST", body: JSON.stringify({name})});
+      form.reset();
+      select("#server-create-dialog").close();
+      await load();
+      await open(result.server.id);
+    } catch (error) {
+      notify(error.message, "error");
+    }
+  });
   select("#server-rename-form").addEventListener("submit", async (event) => { event.preventDefault(); try { await api(`/api/v1/servers/${encodeURIComponent(selected.id)}`, {method: "PATCH", body: JSON.stringify({name: event.currentTarget.elements.name.value})}); await load(); await open(selected.id); select("#server-settings-dialog").close(); } catch (error) { notify(error.message, "error"); } });
   select("#server-transfer-form").addEventListener("submit", async (event) => { event.preventDefault(); try { await api(`/api/v1/servers/${encodeURIComponent(selected.id)}/ownership`, {method: "POST", body: JSON.stringify({userId: event.currentTarget.elements.userId.value, confirm: event.currentTarget.elements.confirm.checked})}); await load(); select("#server-settings-dialog").close(); } catch (error) { notify(error.message, "error"); } });
   select("#server-leave-button").addEventListener("click", async () => { try { await api(`/api/v1/servers/${encodeURIComponent(selected.id)}/leave`, {method: "POST", body: "{}"}); select("#server-settings-dialog").close(); selected = null; await load(); navigation.destination("home"); navigation.friends(); } catch (error) { notify(error.message, "error"); } });

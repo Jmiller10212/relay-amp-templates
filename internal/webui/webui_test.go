@@ -83,13 +83,24 @@ func TestReleaseAssetsUseOneCacheBustingVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"/styles.css?v=0.7.0", "/friends.css?v=0.7.0", "/app.js?v=0.7.0"} {
+	for _, want := range []string{"/styles.css?v=0.7.1", "/friends.css?v=0.7.1", "/app.js?v=0.7.1"} {
 		if !strings.Contains(string(html), want) {
 			t.Fatalf("missing versioned asset %s", want)
 		}
 	}
-	if strings.Count(string(app), "?v=0.7.0") != 10 {
+	if strings.Count(string(app), "?v=0.7.1") != 10 {
 		t.Fatal("all application module imports must share the release cache-busting version")
+	}
+}
+
+func TestServerCreateKeepsFormReferenceAcrossAwait(t *testing.T) {
+	script, err := os.ReadFile("assets/servers.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(script)
+	if !strings.Contains(source, "const form = event.currentTarget;") || strings.Contains(source, "event.currentTarget.reset()") {
+		t.Fatal("server creation must retain its form before awaiting the API response")
 	}
 }
 

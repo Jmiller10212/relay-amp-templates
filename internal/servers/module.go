@@ -165,6 +165,10 @@ func (m *Module) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item, err := m.store.CreateServer(r.Context(), ids.New(), ids.New(), ids.New(), p.User.ID, name, m.cfg.MaxOwned, m.cfg.MaxMemberships)
+	if errors.Is(err, persistence.ErrServerNameTaken) {
+		api.WriteError(w, 409, "server_name_taken", "You already own a server with that name.", "name")
+		return
+	}
 	if errors.Is(err, persistence.ErrServerLimit) {
 		api.WriteError(w, 409, "server_limit", "You have reached the owned-server limit.", "")
 		return
@@ -200,6 +204,10 @@ func (m *Module) rename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item, err := m.store.RenameServer(r.Context(), r.PathValue("id"), p.User.ID, name)
+	if errors.Is(err, persistence.ErrServerNameTaken) {
+		api.WriteError(w, 409, "server_name_taken", "You already own a server with that name.", "name")
+		return
+	}
 	if err != nil {
 		notFound(w)
 		return

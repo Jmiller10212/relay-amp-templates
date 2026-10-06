@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"relay/internal/model"
@@ -28,8 +29,13 @@ func (m *Module) CreateServer(ctx context.Context, serverID, conversationID, cha
 	if memberships >= maxMemberships {
 		return model.Server{}, ErrMembershipLimit
 	}
+	if err = ensureServerNameAvailable(ctx, tx, ownerID, name, ""); err != nil {
+		return model.Server{}, err
+	}
 	now := nowText()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO servers(id,name,owner_user_id,created_at,updated_at) VALUES(?,?,?,?,?)`, serverID, name, ownerID, now, now); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO servers(id,name,name_key,owner_user_id,created_at,updated_at) VALUES(?,?,?,?,?,?)`, serverID, name, serverNameKey(name), ownerID, now, now); isUnique(err) {
+		return model.Server{}, ErrServerNameTaken
+	} else if err != nil {
 		return model.Server{}, err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO server_members(server_id,user_id,joined_at) VALUES(?,?,?)`, serverID, ownerID, now); err != nil {
@@ -139,15 +145,52 @@ func (m *Module) ServerMembers(ctx context.Context, serverID, userID string) ([]
 }
 
 func (m *Module) RenameServer(ctx context.Context, serverID, ownerID, name string) (model.Server, error) {
-	res, err := m.db.ExecContext(ctx, `UPDATE servers SET name=?,updated_at=? WHERE id=? AND owner_user_id=?`, name, nowText(), serverID, ownerID)
+	tx, err := m.db.BeginTx(ctx, nil)
 	if err != nil {
 		return model.Server{}, err
 	}
-	n, _ := res.RowsAffected()
-	if n != 1 {
+	defer tx.Rollback()
+	var found int
+	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM servers WHERE id=? AND owner_user_id=?)`, serverID, ownerID).Scan(&found); err != nil {
+		return model.Server{}, err
+	}
+	if found != 1 {
 		return model.Server{}, ErrServerNotFound
 	}
+	if err = ensureServerNameAvailable(ctx, tx, ownerID, name, serverID); err != nil {
+		return model.Server{}, err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE servers SET name=?,name_key=?,updated_at=? WHERE id=?`, name, serverNameKey(name), nowText(), serverID); isUnique(err) {
+		return model.Server{}, ErrServerNameTaken
+	} else if err != nil {
+		return model.Server{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return model.Server{}, err
+	}
 	return m.Server(ctx, serverID, ownerID)
+}
+
+func serverNameKey(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func ensureServerNameAvailable(ctx context.Context, tx *sql.Tx, ownerID, name, excludeID string) error {
+	rows, err := tx.QueryContext(ctx, `SELECT id,name FROM servers WHERE owner_user_id=?`, ownerID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, existing string
+		if err = rows.Scan(&id, &existing); err != nil {
+			return err
+		}
+		if id != excludeID && strings.EqualFold(strings.TrimSpace(existing), strings.TrimSpace(name)) {
+			return ErrServerNameTaken
+		}
+	}
+	return rows.Err()
 }
 
 func (m *Module) CreateServerInvite(ctx context.Context, id, serverID, inviterID, inviteeID string, maxPerHour int) (model.ServerInvite, error) {

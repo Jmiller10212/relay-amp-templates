@@ -1,4 +1,4 @@
-# Relay 0.7.0
+# Relay 0.7.1
 
 Relay is a private real-time communication server. Version 0.7 adds private servers, friend invitations, automatic `#general` channels, membership and ownership management, and durable browser sessions on top of the existing Friends and direct-message foundation. It remains one self-contained Go executable with an embedded responsive browser client, SQLite application storage, Supabase Auth, WebSockets, health reporting, and an AMP-friendly console.
 
@@ -50,7 +50,7 @@ Requirements for building are Go 1.24 or newer. Runtime has no external library 
 
 3. Set `authentication.public_base_url` in `relay.json` to the exact Relay origin, such as `http://127.0.0.1:8080` for local testing.
 4. Run `relay-server --config relay.json`.
-5. Open the printed address. A successful release build prints `RELAY READY address=... version=0.7.0`.
+5. Open the printed address. A successful release build prints `RELAY READY address=... version=0.7.1`.
 
 Useful flags override JSON: `--config`, `--data-dir`, `--listen`, `--port`, and `--version`. Precedence is command line, then JSON, then defaults.
 
@@ -127,9 +127,9 @@ The example file documents the complete shape. Important authentication fields a
 - `rate_limit_attempts` and `rate_limit_window_seconds`: Relay's per-IP BFF limit; Supabase limits remain a second layer.
 - `session_validation_seconds`: open-WebSocket Supabase revalidation interval.
 
-Server limits are `server_name_max_runes` (100), `max_owned_servers` (20), `max_server_memberships` (100), and `server_invites_per_hour` (30). Server names are trimmed Unicode plain text without control characters. Invitations may only target an existing friend. The relationship may end afterward without invalidating an already-issued invitation.
+Server limits are `server_name_max_runes` (100), `max_owned_servers` (20), `max_server_memberships` (100), and `server_invites_per_hour` (30). Server names are trimmed Unicode plain text without control characters. A user cannot own two servers with the same case-insensitive name, while different owners may use the same name. Existing duplicates from 0.7.0 are preserved but no new matching duplicate can be created. Invitations may only target an existing friend. The relationship may end afterward without invalidating an already-issued invitation.
 
-The obsolete `allow_duplicate_names` and top-level `username_max_runes` keys remain accepted for upgrade compatibility. The account system's username/display-name settings are authoritative in 0.7.0.
+The obsolete `allow_duplicate_names` and top-level `username_max_runes` keys remain accepted for upgrade compatibility. The account system's username/display-name settings are authoritative in 0.7.1.
 
 Modules are compile-time internal modules. `accounts` requires `persistence`; `realtime` requires `accounts`; `friends` requires persistence, accounts, and realtime; `chat` requires accounts and persistence; `direct_messages` requires persistence, accounts, realtime, friends, and chat; `servers` requires persistence, accounts, realtime, friends, and chat; the versioned client API requires chat and realtime; `health` requires persistence. Invalid enabled combinations fail clearly during startup. Direct messages and servers are enabled by default for old configuration files that omit the newer switches.
 
@@ -195,7 +195,7 @@ The `amp/` directory contains `relay.kvp`, settings manifest, metaconfig, port d
 
 Stop Relay, click **Update**, and start it again. The configured package URL follows the latest GitHub release automatically. The update archive contains only package-managed files and deliberately omits `relay.json` and `data/`, so application settings, account profiles, chat history, and the SQLite database remain in place. A versioned release asset can still be entered temporarily when a rollback is required.
 
-Older AMP instances cache the template version they were created from. Relay 0.7.0 therefore accepts the Supabase project URL and publishable key from either AMP environment variables or the `authentication.supabase_url` and `authentication.supabase_publishable_key` compatibility fields in `relay.json`; environment variables win. New instances expose the full settings page directly, including Direct Messages, Servers, server limits, and invitation throttling.
+Older AMP instances cache the template version they were created from. Relay 0.7.1 therefore accepts the Supabase project URL and publishable key from either AMP environment variables or the `authentication.supabase_url` and `authentication.supabase_publishable_key` compatibility fields in `relay.json`; environment variables win. New instances expose the full settings page directly, including Direct Messages, Servers, server limits, and invitation throttling.
 
 Update archives deliberately omit `relay.json` and `data/`. AMP smart exclusion is disabled so package-managed files such as the executable update reliably; live configuration/database files are preserved because they are not in the archive.
 
@@ -216,4 +216,4 @@ No HTTP server, persistence implementation, or chat code needs modification unle
 
 ## Security limitations
 
-Relay 0.7.0 includes real account authentication, persistent friends, one-to-one DMs, and private owner/member servers, but it is still an early private-network application. It has no MFA, social login, email-address changes, account deletion, avatars, group DMs, custom channels, granular roles/permissions, moderation UI, attachment scanning, end-to-end encryption, or multi-instance coordination. TLS termination is external to Relay. Server administrators can read SQLite message history. Keep it on a trusted private network until HTTPS, a production domain, redirect allowlists, custom SMTP, backups, monitoring, and operational access controls are in place.
+Relay 0.7.1 includes real account authentication, persistent friends, one-to-one DMs, and private owner/member servers, but it is still an early private-network application. It has no MFA, social login, email-address changes, account deletion, avatars, group DMs, custom channels, granular roles/permissions, moderation UI, attachment scanning, end-to-end encryption, or multi-instance coordination. TLS termination is external to Relay. Server administrators can read SQLite message history. Keep it on a trusted private network until HTTPS, a production domain, redirect allowlists, custom SMTP, backups, monitoring, and operational access controls are in place.

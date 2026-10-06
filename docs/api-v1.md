@@ -52,7 +52,7 @@ DM events are `conversation.created`, `message.created`, and `conversation.unrea
 
 ## Servers
 
-`GET /api/v1/servers` lists only servers in which the caller is currently a member. `POST /api/v1/servers` accepts `{"name":"..."}` and atomically creates the server, owner membership, channel conversation, and default `#general` channel.
+`GET /api/v1/servers` lists only servers in which the caller is currently a member. `POST /api/v1/servers` accepts `{"name":"..."}` and atomically creates the server, owner membership, channel conversation, and default `#general` channel. Server names are case-insensitively unique among servers owned by the same user; a duplicate returns `409 server_name_taken`. Different owners may use the same name.
 
 `GET`, `PATCH`, and `DELETE /api/v1/servers/{serverId}` read, rename, or permanently delete a server. Deletion is owner-only and requires `{"name":"exact current name"}`. `GET /api/v1/servers/{serverId}/members` returns public Relay identities and effective owner/member roles. Owners remove a member with `DELETE /api/v1/servers/{serverId}/members/{userId}` and transfer ownership with `POST /api/v1/servers/{serverId}/ownership` plus `{"userId":"..."}`. Members leave through `POST /api/v1/servers/{serverId}/leave`; owners must transfer or delete first.
 
