@@ -365,6 +365,36 @@
     "EnumValues": {"False":"false","True":"true"}
   },
   {
+    "DisplayName": "Exact User Lookups Per Minute",
+    "Category": "Relay:forum",
+    "Subcategory": "Friends:group:5",
+    "Description": "Per-account and per-IP limit for exact username lookups.",
+    "Keywords": "friends,lookup,rate,limit",
+    "FieldName": "UserLookupsPerMinute",
+    "InputType": "number",
+    "ParamFieldName": "$.user_lookups_per_minute",
+    "IncludeInCommandLine": false,
+    "DefaultValue": "30",
+    "MinValue": "1",
+    "MaxValue": "10000",
+    "EnumValues": {}
+  },
+  {
+    "DisplayName": "Friend Changes Per Minute",
+    "Category": "Relay:forum",
+    "Subcategory": "Friends:group:5",
+    "Description": "Per-account limit for friend request, acceptance, cancellation, and removal operations.",
+    "Keywords": "friends,mutation,rate,limit",
+    "FieldName": "FriendMutationsPerMinute",
+    "InputType": "number",
+    "ParamFieldName": "$.friend_mutations_per_minute",
+    "IncludeInCommandLine": false,
+    "DefaultValue": "20",
+    "MinValue": "1",
+    "MaxValue": "10000",
+    "EnumValues": {}
+  },
+  {
     "DisplayName": "Minimum Username Length",
     "Category": "Relay:forum",
     "Subcategory": "Validation:rule:5",
@@ -521,6 +551,19 @@
     "FieldName": "ModuleRealtime",
     "InputType": "checkbox",
     "ParamFieldName": "$.modules.realtime",
+    "IncludeInCommandLine": false,
+    "DefaultValue": "true",
+    "EnumValues": {"False":"false","True":"true"}
+  },
+  {
+    "DisplayName": "Enable Friends Module",
+    "Category": "Relay:forum",
+    "Subcategory": "Modules:extension:7",
+    "Description": "Provides exact username lookup, friend requests, friendships, and friend presence. Requires persistence, accounts, and realtime.",
+    "Keywords": "module,friends,requests,presence",
+    "FieldName": "ModuleFriends",
+    "InputType": "checkbox",
+    "ParamFieldName": "$.modules.friends",
     "IncludeInCommandLine": false,
     "DefaultValue": "true",
     "EnumValues": {"False":"false","True":"true"}
