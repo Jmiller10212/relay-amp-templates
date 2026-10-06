@@ -513,10 +513,23 @@
     "EnumValues": {"False":"false","True":"true"}
   },
   {
+    "DisplayName": "Enable Realtime Module",
+    "Category": "Relay:forum",
+    "Subcategory": "Modules:extension:7",
+    "Description": "Provides authenticated user-scoped realtime events. Required by the versioned browser client.",
+    "Keywords": "module,realtime,websocket,events",
+    "FieldName": "ModuleRealtime",
+    "InputType": "checkbox",
+    "ParamFieldName": "$.modules.realtime",
+    "IncludeInCommandLine": false,
+    "DefaultValue": "true",
+    "EnumValues": {"False":"false","True":"true"}
+  },
+  {
     "DisplayName": "Enable Chat Module",
     "Category": "Relay:forum",
     "Subcategory": "Modules:extension:7",
-    "Description": "Provides the authenticated shared-room WebSocket endpoint. Requires accounts and persistence.",
+    "Description": "Provides global-lobby messaging and legacy WebSocket compatibility. Requires accounts, persistence, and realtime.",
     "Keywords": "module,chat,websocket",
     "FieldName": "ModuleChat",
     "InputType": "checkbox",
