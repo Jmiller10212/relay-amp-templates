@@ -83,12 +83,12 @@ func TestReleaseAssetsUseOneCacheBustingVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"/styles.css?v=0.7.3", "/friends.css?v=0.7.3", "/app.js?v=0.7.3", "/notification.wav?v=0.7.3"} {
+	for _, want := range []string{"/styles.css?v=0.7.4", "/friends.css?v=0.7.4", "/app.js?v=0.7.4", "/notification.wav?v=0.7.4"} {
 		if !strings.Contains(string(html), want) {
 			t.Fatalf("missing versioned asset %s", want)
 		}
 	}
-	if strings.Count(string(app), "?v=0.7.3") != 10 {
+	if strings.Count(string(app), "?v=0.7.4") != 10 {
 		t.Fatal("all application module imports must share the release cache-busting version")
 	}
 }
@@ -107,13 +107,18 @@ func TestNotificationSoundAndMentionClientAreEmbedded(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(app)
-	for _, want := range []string{"renderMentionSuggestions", "selectMention", "showDirectMessageAlert", "showServerInvitationAlert", "playNotificationSound", "serverUI.recordChannelActivity"} {
+	for _, want := range []string{"renderMentionSuggestions", "selectMention", "playDirectMessageSound", "showServerInvitationAlert", "playNotificationSound", "serverUI.recordChannelActivity"} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("missing notification client behavior %s", want)
 		}
 	}
 	if strings.Contains(source, "mode === \"all\" && !mentioned") {
 		t.Fatal("ordinary channel messages must not produce a popup or sound")
+	}
+	for _, forbidden := range []string{"sent you a direct message:", "in ${entry.server.name}"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("chat messages must not create centered popup text: %s", forbidden)
+		}
 	}
 }
 

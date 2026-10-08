@@ -62,7 +62,7 @@ DM events are `conversation.created`, `message.created`, and `conversation.unrea
 
 Members list pins with `GET /api/v1/channels/{channelId}/pins`. Only the server owner can add or remove them through `PUT` or `DELETE /api/v1/channels/{channelId}/pins/{messageId}`. Pins reference the original message rather than copying it. Realtime events `channel.pin.created` and `channel.pin.removed` are routed only to current server members.
 
-`GET` and `PUT /api/v1/channels/{channelId}/notification-preference` read or set the caller's private `all`, `mentions`, or `nothing` mode. `all` marks every inactive-channel message unread, `mentions` marks only literal mentions unread, and `nothing` suppresses channel indicators. Exact mentions additionally create a clickable in-app notice and sound; ordinary channel messages never do. These modes never suppress delivery or history.
+`GET` and `PUT /api/v1/channels/{channelId}/notification-preference` read or set the caller's private `all`, `mentions`, or `nothing` mode. `all` marks every inactive-channel message unread, `mentions` marks only literal mentions unread, and `nothing` suppresses channel indicators. Exact mentions additionally play a sound but do not display a centered message popup; ordinary channel messages do neither. These modes never suppress delivery or history.
 
 Members invite a current Relay friend through `POST /api/v1/servers/{serverId}/invites` with `{"userId":"..."}`. `GET /api/v1/server-invites` lists the caller's incoming invitations. Accept and decline use `POST /api/v1/server-invites/{inviteId}/accept` and `/decline`; the inviter or server owner cancels with `DELETE /api/v1/server-invites/{inviteId}`. Pending invitations remain valid if the friendship later ends.
 

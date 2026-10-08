@@ -1,13 +1,13 @@
-import {api} from "/api.js?v=0.7.3";
-import {state} from "/state.js?v=0.7.3";
-import {RelayRealtime} from "/realtime.js?v=0.7.3";
-import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.3";
-import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.3";
-import {renderAccount} from "/settings.js?v=0.7.3";
-import {createFriendsUI} from "/friends.js?v=0.7.3";
-import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.3";
-import {createNavigation} from "/navigation.js?v=0.7.3";
-import {createServersUI} from "/servers.js?v=0.7.3";
+import {api} from "/api.js?v=0.7.4";
+import {state} from "/state.js?v=0.7.4";
+import {RelayRealtime} from "/realtime.js?v=0.7.4";
+import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.4";
+import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.4";
+import {renderAccount} from "/settings.js?v=0.7.4";
+import {createFriendsUI} from "/friends.js?v=0.7.4";
+import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.4";
+import {createNavigation} from "/navigation.js?v=0.7.4";
+import {createServersUI} from "/servers.js?v=0.7.4";
 
 const $ = (selector) => document.querySelector(selector);
 const authShell = $("#auth-shell");
@@ -260,7 +260,7 @@ async function handleRealtime(event) {
     if (event.data?.serverId && fromAnotherUser && inactiveOrHidden) await handleChannelActivity(message);
     if (!event.data?.serverId && message.conversationId !== state.bootstrap?.globalLobby?.id) {
       await refreshDirectState();
-      if (fromAnotherUser && inactiveOrHidden) showDirectMessageAlert(message);
+      if (fromAnotherUser && inactiveOrHidden) playDirectMessageSound(message);
     }
   } else if (event.type === "presence.changed" || event.type === "profile.updated") {
     await refreshPresence(); await refreshSocialState(); await serverUI.handleRealtime(event);
@@ -284,22 +284,19 @@ function isCurrentUserMentioned(text) {
 }
 
 async function handleChannelActivity(message) {
-  const entry = serverUI.channelForConversation(message.conversationId); if (!entry) return;
+  if (!serverUI.channelForConversation(message.conversationId)) return;
   let mode = "mentions";
   try { mode = await serverUI.notificationModeForConversation(message.conversationId); } catch (_) { return; }
   const mentioned = isCurrentUserMentioned(message.text);
   serverUI.recordChannelActivity(message.conversationId, mentioned, mode);
   if (mode === "nothing" || !mentioned) return;
-  const text = `${message.displayName || message.username} in ${entry.server.name} #${entry.channel.name}: ${message.text}`;
-  const open = () => serverUI.open(entry.server.id, {targetMessageId: message.id});
-  showClickableNotice(text, open); playNotificationSound();
+  playNotificationSound();
 }
 
-function showDirectMessageAlert(message) {
+function playDirectMessageSound(message) {
   const conversation = dmUI.getConversations().find((item) => item.id === message.conversationId);
   if (!conversation) return;
-  const text = `${message.displayName || message.username} sent you a direct message: ${message.text}`;
-  showClickableNotice(text, () => activateConversation(conversation)); playNotificationSound();
+  playNotificationSound();
 }
 
 function showServerInvitationAlert(invite) {
