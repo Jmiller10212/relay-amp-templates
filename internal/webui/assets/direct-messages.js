@@ -1,4 +1,4 @@
-import {api} from "/api.js?v=0.7.2";
+import {api} from "/api.js?v=0.7.3";
 
 export function createDirectMessagesUI(select, friendsUI, notify, activateConversation, getActiveConversation) {
   let conversations = [];

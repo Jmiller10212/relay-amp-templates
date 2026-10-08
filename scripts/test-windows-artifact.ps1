@@ -14,7 +14,7 @@ foreach ($name in $expected.Keys) {
 
 $executable = Join-Path $dist "relay-server-windows-amd64.exe"
 $version = & $executable --version
-if ($version -ne "0.7.2") { throw "Windows version was $version" }
+if ($version -ne "0.7.3") { throw "Windows version was $version" }
 
 $testRoot = Join-Path $env:TEMP ("relay-win-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $testRoot | Out-Null

@@ -1,9 +1,10 @@
-import {api} from "/api.js?v=0.7.2";
+import {api} from "/api.js?v=0.7.3";
 
 export function createServersUI(select, friendsUI, notify, navigation, activateConversation) {
   let servers = [], invites = [], selected = null, members = [], pins = [];
   let notificationMode = "all", searchCursor = 0, searchParams = null;
   const notificationModes = new Map();
+  const channelActivity = new Map();
   let memberPanelWanted = localStorage.getItem("relay.memberPanelVisible") !== "false";
   const enc = encodeURIComponent;
   const initials = (name = "") => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "S";
@@ -22,9 +23,33 @@ export function createServersUI(select, friendsUI, notify, navigation, activateC
     servers.forEach((server) => {
       const button = document.createElement("button");
       button.type = "button"; button.className = `rail-button ${selected?.id === server.id ? "active" : ""}`;
-      button.title = server.name; button.setAttribute("aria-label", server.name); button.textContent = initials(server.name);
+      const activity = (server.channels || []).reduce((total, item) => total + (channelActivity.get(item.conversationId)?.count || 0), 0);
+      const mentioned = (server.channels || []).some((item) => channelActivity.get(item.conversationId)?.mentioned);
+      button.title = server.name; button.setAttribute("aria-label", `${server.name}${activity ? `, ${activity} unread` : ""}`);
+      const label = document.createElement("span"); label.textContent = initials(server.name); button.append(label);
+      if (activity) { const badge = document.createElement("b"); badge.className = "rail-badge"; badge.textContent = activity > 99 ? "99+" : String(activity); button.append(badge); }
+      button.classList.toggle("mention-pulse", mentioned);
       button.addEventListener("click", () => open(server.id)); rail.append(button);
     });
+  }
+
+  function renderSelectedChannelActivity() {
+    const conversationID = selectedChannel()?.conversationId, activity = channelActivity.get(conversationID);
+    const button = select("#server-general-button"), badge = select("#server-general-badge");
+    const count = activity?.count || 0; badge.textContent = count > 99 ? "99+" : String(count); badge.hidden = !count;
+    button.classList.toggle("mention-pulse", Boolean(activity?.mentioned));
+  }
+
+  function recordChannelActivity(conversationID, mentioned, mode) {
+    if (mode === "nothing" || (mode === "mentions" && !mentioned)) return;
+    const activity = channelActivity.get(conversationID) || {count: 0, mentioned: false};
+    activity.count += 1; activity.mentioned ||= mentioned; channelActivity.set(conversationID, activity);
+    renderRail(); renderSelectedChannelActivity();
+  }
+
+  function markConversationSeen(conversationID) {
+    if (!conversationID || !channelActivity.delete(conversationID)) return;
+    renderRail(); renderSelectedChannelActivity();
   }
 
   function renderInvites() {
@@ -87,7 +112,12 @@ export function createServersUI(select, friendsUI, notify, navigation, activateC
     configureMenu(); navigation.destination("server", selected.id); renderRail();
     await Promise.all([refreshMembers(), loadPins(), loadNotificationPreference()]);
     const conversation = conversationForSelected();
-    if (conversation) { await activateConversation(conversation, options); applyMemberPanel(); }
+    if (conversation) {
+      await activateConversation(conversation, options);
+      if (document.visibilityState === "visible") markConversationSeen(conversation.id);
+      else renderSelectedChannelActivity();
+      applyMemberPanel();
+    }
   }
 
   function showInvitations() { closeMenu(); deactivateChannel(); navigation.destination("home"); navigation.invitations(); renderInvites(); }
@@ -289,5 +319,5 @@ export function createServersUI(select, friendsUI, notify, navigation, activateC
   select("#server-leave-button").addEventListener("click", () => leaveServer().catch((error) => notify(error.message, "error")));
   select("#server-delete-form").addEventListener("submit", async (event) => { event.preventDefault(); try { await api(`/api/v1/servers/${enc(selected.id)}`, {method: "DELETE", body: JSON.stringify({name: event.currentTarget.elements.name.value})}); select("#server-settings-dialog").close(); selected = null; await load(); deactivateChannel(); navigation.destination("home"); navigation.friends(); } catch (error) { notify(error.message, "error"); } });
 
-  return {load, open, showInvitations, refreshMembers, handleRealtime, togglePin, isPinned, deactivateChannel, invitationCount: () => invites.length, getServers: () => servers, selected: () => selected, notificationModeForConversation, channelForConversation: (conversationID) => servers.flatMap((server) => (server.channels || []).map((item) => ({server, channel: item}))).find((entry) => entry.channel.conversationId === conversationID)};
+  return {load, open, showInvitations, refreshMembers, handleRealtime, togglePin, isPinned, deactivateChannel, invitationCount: () => invites.length, getServers: () => servers, selected: () => selected, notificationModeForConversation, recordChannelActivity, markConversationSeen, mentionCandidates: () => members.map((member) => member.user), channelForConversation: (conversationID) => servers.flatMap((server) => (server.channels || []).map((item) => ({server, channel: item}))).find((entry) => entry.channel.conversationId === conversationID)};
 }

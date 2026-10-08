@@ -1,6 +1,6 @@
-# Relay 0.7.2
+# Relay 0.7.3
 
-Relay is a private real-time communication server. Version 0.7.2 adds a focused server header, realtime member panel, member-authorized server search, owner-managed pinned messages, and persistent per-channel in-app notification choices on top of private servers, Friends, and direct messages. It remains one self-contained Go executable with an embedded responsive browser client, SQLite application storage, Supabase Auth, WebSockets, health reporting, and an AMP-friendly console.
+Relay is a private real-time communication server. Version 0.7.3 adds member mention autocomplete, quiet per-server unread indicators, and a bundled notification sound used only for direct messages, server invitations, and actual `@username` mentions. It retains the focused server header, realtime member panel, scoped search, pins, private servers, Friends, and direct messages from 0.7.2. Relay remains one self-contained Go executable with an embedded responsive browser client, SQLite application storage, Supabase Auth, WebSockets, health reporting, and an AMP-friendly console.
 
 ## What is included
 
@@ -18,7 +18,7 @@ Relay is a private real-time communication server. Version 0.7.2 adds a focused 
 - Exact-username friend lookup, incoming/outgoing requests, crossed-request auto-accept, removal, badges, and friend-only presence
 - One-to-one direct messages with one canonical conversation per friend pair, persistent unread cursors, and history retained read-only after unfriending
 - Private servers with owner/member permissions, friend-only invitations, ownership transfer, leave/removal, typed deletion confirmation, and one automatic `#general` channel
-- Server tools with a responsive member panel, server-scoped message search, owner-managed pins, and `all`, `mentions`, or `nothing` in-app notification preferences
+- Server tools with a responsive member panel, server-scoped message search, owner-managed pins, mention autocomplete, and `all`, `mentions`, or `nothing` unread preferences
 - Server messages use the shared persistence-first conversation pipeline and are routed only to current members
 - Discord-inspired Relay shell with a 72px destination rail, 240px context sidebar, dense Friends views, searchable authorized DMs, and responsive mobile navigation
 - Embedded Login, Create Account, Check Email, Forgot Password, Reset Password, Finish Profile, Chat, and Account Settings views
@@ -51,7 +51,7 @@ Requirements for building are Go 1.24 or newer. Runtime has no external library 
 
 3. Set `authentication.public_base_url` in `relay.json` to the exact Relay origin, such as `http://127.0.0.1:8080` for local testing.
 4. Run `relay-server --config relay.json`.
-5. Open the printed address. A successful release build prints `RELAY READY address=... version=0.7.2`.
+5. Open the printed address. A successful release build prints `RELAY READY address=... version=0.7.3`.
 
 Useful flags override JSON: `--config`, `--data-dir`, `--listen`, `--port`, and `--version`. Precedence is command line, then JSON, then defaults.
 
@@ -130,7 +130,7 @@ The example file documents the complete shape. Important authentication fields a
 
 Server limits are `server_name_max_runes` (100), `max_owned_servers` (20), `max_server_memberships` (100), and `server_invites_per_hour` (30). Server names are trimmed Unicode plain text without control characters. A user cannot own two servers with the same case-insensitive name, while different owners may use the same name. Existing duplicates from 0.7.0 are preserved but no new matching duplicate can be created. Invitations may only target an existing friend. The relationship may end afterward without invalidating an already-issued invitation.
 
-The obsolete `allow_duplicate_names` and top-level `username_max_runes` keys remain accepted for upgrade compatibility. The account system's username/display-name settings are authoritative in 0.7.2.
+The obsolete `allow_duplicate_names` and top-level `username_max_runes` keys remain accepted for upgrade compatibility. The account system's username/display-name settings are authoritative in 0.7.3.
 
 Modules are compile-time internal modules. `accounts` requires `persistence`; `realtime` requires `accounts`; `friends` requires persistence, accounts, and realtime; `chat` requires accounts and persistence; `direct_messages` requires persistence, accounts, realtime, friends, and chat; `servers` requires persistence, accounts, realtime, friends, and chat; the versioned client API requires chat and realtime; `health` requires persistence. Invalid enabled combinations fail clearly during startup. Direct messages and servers are enabled by default for old configuration files that omit the newer switches.
 
@@ -155,7 +155,7 @@ Direct-message resources are `GET/POST /api/v1/direct-conversations`, the common
 
 Server resources are `GET/POST /api/v1/servers`, server details/rename/delete, members, ownership transfer, leave/removal, channel listing, friend invitations, and incoming invitation actions. Creating a server atomically creates its owner membership, channel conversation, and default `#general`. Current membership is required for channel history and sends. Owners alone may rename, remove members, transfer ownership, or permanently delete a server. An owner must transfer ownership or delete the server before leaving.
 
-Server search is `GET /api/v1/servers/{serverId}/search` and remains bounded to channels in a server where the caller is currently a member. The embedded client supports free text plus `from:username`, `in:channel`, and `mentions:username`; mention matching is literal case-insensitive `@username` text because structured mentions are not implemented. Message context, pins, and notification-preference resources are documented in [docs/api-v1.md](docs/api-v1.md).
+Server search is `GET /api/v1/servers/{serverId}/search` and remains bounded to channels in a server where the caller is currently a member. The embedded client supports free text plus `from:username`, `in:channel`, and `mentions:username`; typing `@` in a composer opens an authorized member picker and inserts the selected username. Mention matching remains literal case-insensitive `@username` text because structured mentions are not implemented. Ordinary inactive-channel messages update an unread badge without interrupting the user. Direct messages, server invitations, and exact mentions additionally show a clickable notice and play the bundled sound. Message context, pins, and notification-preference resources are documented in [docs/api-v1.md](docs/api-v1.md).
 
 Account endpoints are under `/api/auth/*` and `/api/account/*`. Errors use:
 
@@ -198,7 +198,7 @@ The `amp/` directory contains `relay.kvp`, settings manifest, metaconfig, port d
 
 Stop Relay, click **Update**, and start it again. The configured package URL follows the latest GitHub release automatically. The update archive contains only package-managed files and deliberately omits `relay.json` and `data/`, so application settings, account profiles, chat history, and the SQLite database remain in place. A versioned release asset can still be entered temporarily when a rollback is required.
 
-Older AMP instances cache the template version they were created from. Relay 0.7.2 therefore accepts the Supabase project URL and publishable key from either AMP environment variables or the `authentication.supabase_url` and `authentication.supabase_publishable_key` compatibility fields in `relay.json`; environment variables win. New instances expose the full settings page directly, including Direct Messages, Servers, server limits, and invitation throttling.
+Older AMP instances cache the template version they were created from. Relay 0.7.3 therefore accepts the Supabase project URL and publishable key from either AMP environment variables or the `authentication.supabase_url` and `authentication.supabase_publishable_key` compatibility fields in `relay.json`; environment variables win. New instances expose the full settings page directly, including Direct Messages, Servers, server limits, and invitation throttling.
 
 Update archives deliberately omit `relay.json` and `data/`. AMP smart exclusion is disabled so package-managed files such as the executable update reliably; live configuration/database files are preserved because they are not in the archive.
 
@@ -219,4 +219,4 @@ No HTTP server, persistence implementation, or chat code needs modification unle
 
 ## Security limitations
 
-Relay 0.7.2 includes real account authentication, persistent friends, one-to-one DMs, and private owner/member servers, but it is still an early private-network application. It has no MFA, social login, email-address changes, account deletion, avatars, group DMs, custom channels, granular roles/permissions, moderation UI, attachment scanning, end-to-end encryption, or multi-instance coordination. TLS termination is external to Relay. Server administrators can read SQLite message history. Keep it on a trusted private network until HTTPS, a production domain, redirect allowlists, custom SMTP, backups, monitoring, and operational access controls are in place.
+Relay 0.7.3 includes real account authentication, persistent friends, one-to-one DMs, and private owner/member servers, but it is still an early private-network application. It has no MFA, social login, email-address changes, account deletion, avatars, group DMs, custom channels, granular roles/permissions, moderation UI, attachment scanning, end-to-end encryption, or multi-instance coordination. TLS termination is external to Relay. Server administrators can read SQLite message history. Keep it on a trusted private network until HTTPS, a production domain, redirect allowlists, custom SMTP, backups, monitoring, and operational access controls are in place.

@@ -1,13 +1,13 @@
-import {api} from "/api.js?v=0.7.2";
-import {state} from "/state.js?v=0.7.2";
-import {RelayRealtime} from "/realtime.js?v=0.7.2";
-import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.2";
-import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.2";
-import {renderAccount} from "/settings.js?v=0.7.2";
-import {createFriendsUI} from "/friends.js?v=0.7.2";
-import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.2";
-import {createNavigation} from "/navigation.js?v=0.7.2";
-import {createServersUI} from "/servers.js?v=0.7.2";
+import {api} from "/api.js?v=0.7.3";
+import {state} from "/state.js?v=0.7.3";
+import {RelayRealtime} from "/realtime.js?v=0.7.3";
+import {addMessage, prependMessages, newestMessageId, renderUsers} from "/conversation.js?v=0.7.3";
+import {formPayload, normalizeUsername, setFormBusy, setFormError} from "/auth.js?v=0.7.3";
+import {renderAccount} from "/settings.js?v=0.7.3";
+import {createFriendsUI} from "/friends.js?v=0.7.3";
+import {createDirectMessagesUI} from "/direct-messages.js?v=0.7.3";
+import {createNavigation} from "/navigation.js?v=0.7.3";
+import {createServersUI} from "/servers.js?v=0.7.3";
 
 const $ = (selector) => document.querySelector(selector);
 const authShell = $("#auth-shell");
@@ -25,6 +25,9 @@ let dmUI;
 let serverUI;
 let restoreTimer = null;
 let restoreDelay = 1000;
+let globalPresenceUsers = [];
+let mentionMatches = [];
+let mentionIndex = 0;
 const friendsUI = createFriendsUI($, showNotice, (userID) => dmUI.openForUser(userID));
 dmUI = createDirectMessagesUI($, friendsUI, showNotice, activateConversation, () => state.activeConversation);
 serverUI = createServersUI($, friendsUI, showNotice, navigation, activateConversation);
@@ -37,6 +40,30 @@ function showNotice(text, kind = "info") {
   target.hidden = !text;
   if (target === appNotice && text) setTimeout(() => { if (target.textContent === text) target.hidden = true; }, 5000);
 }
+
+function playNotificationSound() {
+  const audio = $("#notification-audio");
+  if (!audio) return;
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+}
+
+function showClickableNotice(text, open) {
+  appNotice.textContent = text; appNotice.className = "notice app-notice info clickable"; appNotice.hidden = false;
+  appNotice.setAttribute("role", "button"); appNotice.tabIndex = 0;
+  appNotice.onclick = open; appNotice.onkeydown = (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } };
+  setTimeout(() => { if (appNotice.textContent === text) appNotice.hidden = true; }, 8000);
+}
+
+function unlockNotificationSound() {
+  const audio = $("#notification-audio"); if (!audio) return;
+  document.removeEventListener("pointerdown", unlockNotificationSound);
+  document.removeEventListener("keydown", unlockNotificationSound);
+  const volume = audio.volume; audio.volume = 0;
+  audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.volume = volume; }).catch(() => { audio.volume = volume; });
+}
+document.addEventListener("pointerdown", unlockNotificationSound);
+document.addEventListener("keydown", unlockNotificationSound);
 function showView(id) { document.querySelectorAll(".view").forEach((view) => { view.hidden = view.id !== id; }); showNotice(""); }
 function setConnection(label, online) { statusPill.textContent = label; statusPill.className = `pill ${online ? "online" : "offline"}`; $("#connection-dot").className = online ? "online" : ""; }
 
@@ -136,6 +163,8 @@ async function activateConversation(conversation, options = {}) {
     navigation.conversation(`# ${conversation.name}`);
   }
   dmUI.render();
+  closeMentionSuggestions();
+  if (conversation.kind === "channel" && document.visibilityState === "visible") serverUI.markConversationSeen(conversation.id);
   if (options.targetMessageId) await loadMessageContext(options.targetMessageId);
   else await loadHistory();
 }
@@ -191,7 +220,7 @@ async function loadOlderHistory() {
 }
 
 async function refreshPresence() {
-  try { const result = await api("/api/v1/presence", {headers: {}}); renderUsers(userList, $("#online-count"), result.users || []); } catch (_) {}
+  try { const result = await api("/api/v1/presence", {headers: {}}); globalPresenceUsers = result.users || []; renderUsers(userList, $("#online-count"), globalPresenceUsers); } catch (_) {}
 }
 
 function connect() {
@@ -220,14 +249,19 @@ function connect() {
 async function handleRealtime(event) {
   if (event.type === "message.created" && event.data?.message) {
     const message = event.data.message;
+    const fromAnotherUser = message.userId !== state.account?.profile?.id;
+    const inactiveOrHidden = message.conversationId !== state.activeConversation?.id || document.visibilityState !== "visible";
     if (message.conversationId === state.activeConversation?.id) {
       const nearBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 80;
       addMessage(messages, state.messageIds, message, {scroll: nearBottom});
       syncPinButtons();
       if (nearBottom) await markReadIfVisible();
     }
-    if (event.data?.serverId && message.userId !== state.account?.profile?.id && (message.conversationId !== state.activeConversation?.id || document.visibilityState !== "visible")) await showChannelAlert(message);
-    if (!event.data?.serverId && message.conversationId !== state.bootstrap?.globalLobby?.id) await refreshDirectState();
+    if (event.data?.serverId && fromAnotherUser && inactiveOrHidden) await handleChannelActivity(message);
+    if (!event.data?.serverId && message.conversationId !== state.bootstrap?.globalLobby?.id) {
+      await refreshDirectState();
+      if (fromAnotherUser && inactiveOrHidden) showDirectMessageAlert(message);
+    }
   } else if (event.type === "presence.changed" || event.type === "profile.updated") {
     await refreshPresence(); await refreshSocialState(); await serverUI.handleRealtime(event);
   } else if (event.type.startsWith("friend.") || event.type.startsWith("friendship.")) {
@@ -237,23 +271,40 @@ async function handleRealtime(event) {
   } else if (event.type.startsWith("server.") || event.type === "channel.created") {
     await serverUI.handleRealtime(event);
     await refreshServerState();
+    if (event.type === "server.invite.created") showServerInvitationAlert(event.data?.invite);
   } else if (event.type === "channel.pin.created" || event.type === "channel.pin.removed") {
     await serverUI.handleRealtime(event); syncPinButtons();
   } else if (event.type === "error") showNotice(event.data?.message || "Realtime error", "error");
 }
 
-async function showChannelAlert(message) {
+function isCurrentUserMentioned(text) {
+  const username = state.account?.profile?.username; if (!username) return false;
+  const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9_])@${escaped}(?![a-z0-9_])`, "i").test(text);
+}
+
+async function handleChannelActivity(message) {
   const entry = serverUI.channelForConversation(message.conversationId); if (!entry) return;
   let mode = "mentions";
   try { mode = await serverUI.notificationModeForConversation(message.conversationId); } catch (_) { return; }
-  const mentioned = message.text.toLocaleLowerCase().includes(`@${state.account.profile.username.toLocaleLowerCase()}`);
-  if (mode === "nothing" || (mode === "mentions" && !mentioned)) return;
+  const mentioned = isCurrentUserMentioned(message.text);
+  serverUI.recordChannelActivity(message.conversationId, mentioned, mode);
+  if (mode === "nothing" || !mentioned) return;
   const text = `${message.displayName || message.username} in ${entry.server.name} #${entry.channel.name}: ${message.text}`;
-  appNotice.textContent = text; appNotice.className = "notice app-notice info clickable"; appNotice.hidden = false;
-  appNotice.setAttribute("role", "button"); appNotice.tabIndex = 0;
   const open = () => serverUI.open(entry.server.id, {targetMessageId: message.id});
-  appNotice.onclick = open; appNotice.onkeydown = (event) => { if (event.key === "Enter" || event.key === " ") open(); };
-  setTimeout(() => { if (appNotice.textContent === text) appNotice.hidden = true; }, 8000);
+  showClickableNotice(text, open); playNotificationSound();
+}
+
+function showDirectMessageAlert(message) {
+  const conversation = dmUI.getConversations().find((item) => item.id === message.conversationId);
+  if (!conversation) return;
+  const text = `${message.displayName || message.username} sent you a direct message: ${message.text}`;
+  showClickableNotice(text, () => activateConversation(conversation)); playNotificationSound();
+}
+
+function showServerInvitationAlert(invite) {
+  const name = invite?.server?.name || "a server";
+  showClickableNotice(`You were invited to ${name}.`, () => serverUI.showInvitations()); playNotificationSound();
 }
 
 async function refreshSocialState() {
@@ -313,6 +364,54 @@ async function markReadIfVisible() {
   }
 }
 
+function mentionCandidates() {
+  if (!state.activeConversation) return [];
+  let candidates = [];
+  if (state.activeConversation.kind === "channel") candidates = serverUI.mentionCandidates();
+  else if (state.activeConversation.kind === "direct") candidates = [state.activeConversation.peer];
+  else candidates = globalPresenceUsers;
+  const ownID = state.account?.profile?.id, seen = new Set();
+  return candidates.filter((user) => user?.id && user.id !== ownID && !seen.has(user.id) && seen.add(user.id));
+}
+
+function closeMentionSuggestions() {
+  mentionMatches = []; mentionIndex = 0;
+  const list = $("#mention-suggestions"), input = $("#message-input");
+  if (list) { list.hidden = true; list.textContent = ""; }
+  if (input) input.setAttribute("aria-expanded", "false");
+}
+
+function renderMentionSuggestions() {
+  const input = $("#message-input"), list = $("#mention-suggestions");
+  const caret = input.selectionStart ?? input.value.length;
+  const match = input.value.slice(0, caret).match(/(^|\s)@([a-z0-9_]*)$/i);
+  if (!match) { closeMentionSuggestions(); return; }
+  const query = match[2].toLowerCase(), start = caret - query.length - 1;
+  mentionMatches = mentionCandidates().filter((user) => user.username.toLowerCase().includes(query) || user.displayName.toLowerCase().includes(query)).slice(0, 8).map((user) => ({user, start, end: caret}));
+  if (!mentionMatches.length) { closeMentionSuggestions(); return; }
+  mentionIndex = Math.min(mentionIndex, mentionMatches.length - 1); list.textContent = "";
+  mentionMatches.forEach((item, index) => {
+    const button = document.createElement("button"); button.type = "button"; button.setAttribute("role", "option"); button.setAttribute("aria-selected", String(index === mentionIndex));
+    const name = document.createElement("strong"); name.textContent = item.user.displayName;
+    const handle = document.createElement("small"); handle.textContent = `@${item.user.username}`;
+    button.append(name, handle); button.addEventListener("mousedown", (event) => event.preventDefault()); button.addEventListener("click", () => selectMention(index)); list.append(button);
+  });
+  list.hidden = false; input.setAttribute("aria-expanded", "true");
+}
+
+function selectMention(index = mentionIndex) {
+  const item = mentionMatches[index], input = $("#message-input"); if (!item) return;
+  const replacement = `@${item.user.username} `;
+  input.value = input.value.slice(0, item.start) + replacement + input.value.slice(item.end);
+  const caret = item.start + replacement.length; input.setSelectionRange(caret, caret); closeMentionSuggestions(); input.focus();
+}
+
+function moveMentionSelection(delta) {
+  if (!mentionMatches.length) return;
+  mentionIndex = (mentionIndex + delta + mentionMatches.length) % mentionMatches.length;
+  [...$("#mention-suggestions").children].forEach((button, index) => button.setAttribute("aria-selected", String(index === mentionIndex)));
+}
+
 $("#message-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.activeConversation) return;
@@ -328,13 +427,25 @@ $("#message-form").addEventListener("submit", async (event) => {
   finally { input.disabled = !state.activeConversation?.canSend; input.focus(); }
 });
 
+$("#message-input").addEventListener("input", () => { mentionIndex = 0; renderMentionSuggestions(); });
+$("#message-input").addEventListener("keydown", (event) => {
+  if (!mentionMatches.length) return;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); moveMentionSelection(event.key === "ArrowDown" ? 1 : -1); }
+  else if (event.key === "Tab" || event.key === "Enter") { event.preventDefault(); selectMention(); }
+  else if (event.key === "Escape") { event.preventDefault(); closeMentionSuggestions(); }
+});
+$("#message-input").addEventListener("blur", () => setTimeout(closeMentionSuggestions, 120));
+
 loadEarlier.addEventListener("click", loadOlderHistory);
 messages.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-pin-message]"); if (!button) return;
   try { await serverUI.togglePin(Number(button.dataset.pinMessage)); syncPinButtons(); } catch (error) { showNotice(error.message, "error"); }
 });
 messages.addEventListener("scroll", () => { if (messages.scrollTop < 32 && state.history.hasMore) loadOlderHistory(); markReadIfVisible(); });
-document.addEventListener("visibilitychange", markReadIfVisible);
+document.addEventListener("visibilitychange", () => {
+  markReadIfVisible();
+  if (document.visibilityState === "visible" && state.activeConversation?.kind === "channel") serverUI.markConversationSeen(state.activeConversation.id);
+});
 $("#rail-home").addEventListener("click", () => { if (state.destination === "home" && state.activeConversation?.kind === "direct") activateConversation(state.activeConversation); else showHomeFriends(); });
 $("#rail-lobby").addEventListener("click", showLobby);
 $("#lobby-room-button").addEventListener("click", showLobby);

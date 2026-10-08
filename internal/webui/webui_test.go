@@ -83,13 +83,37 @@ func TestReleaseAssetsUseOneCacheBustingVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"/styles.css?v=0.7.2", "/friends.css?v=0.7.2", "/app.js?v=0.7.2"} {
+	for _, want := range []string{"/styles.css?v=0.7.3", "/friends.css?v=0.7.3", "/app.js?v=0.7.3", "/notification.wav?v=0.7.3"} {
 		if !strings.Contains(string(html), want) {
 			t.Fatalf("missing versioned asset %s", want)
 		}
 	}
-	if strings.Count(string(app), "?v=0.7.2") != 10 {
+	if strings.Count(string(app), "?v=0.7.3") != 10 {
 		t.Fatal("all application module imports must share the release cache-busting version")
+	}
+}
+
+func TestNotificationSoundAndMentionClientAreEmbedded(t *testing.T) {
+	response := httptest.NewRecorder()
+	Handler().ServeHTTP(response, httptest.NewRequest("GET", "/notification.wav", nil))
+	if response.Code != 200 || response.Body.Len() < 1000 {
+		t.Fatalf("notification sound status=%d size=%d", response.Code, response.Body.Len())
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "audio") {
+		t.Fatalf("notification sound content type = %q", contentType)
+	}
+	app, err := os.ReadFile("assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(app)
+	for _, want := range []string{"renderMentionSuggestions", "selectMention", "showDirectMessageAlert", "showServerInvitationAlert", "playNotificationSound", "serverUI.recordChannelActivity"} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("missing notification client behavior %s", want)
+		}
+	}
+	if strings.Contains(source, "mode === \"all\" && !mentioned") {
+		t.Fatal("ordinary channel messages must not produce a popup or sound")
 	}
 }
 

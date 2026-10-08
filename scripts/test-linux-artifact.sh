@@ -36,7 +36,7 @@ printf '%s\n' status >&3
 printf '%s\n' stop >&3
 wait "$pid"
 pid=""
-grep -q 'RELAY READY .*version=0.7.2' "$test_root/console.log"
+grep -q 'RELAY READY .*version=0.7.3' "$test_root/console.log"
 grep -q 'STATUS ready=true' "$test_root/console.log"
 grep -q 'shutdown complete' "$test_root/console.log"
 test -s "$test_root/data/relay.db"
@@ -53,4 +53,4 @@ wait "$pid"
 pid=""
 grep -q 'shutdown complete' "$test_root/sigterm.log"
 
-printf 'Linux artifact: version=0.7.2 health=ok console=ok SIGINT=ok SIGTERM=ok restart=ok\n'
+printf 'Linux artifact: version=0.7.3 health=ok console=ok SIGINT=ok SIGTERM=ok restart=ok\n'
